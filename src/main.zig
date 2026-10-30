@@ -89,28 +89,24 @@ const KIND = enum(u7) {
     U = 0x07,
 };
 
+const OP_R = enum(u32) { ADD=0, SUB=0, AND=7, OR=6, XOR=4, SLL=1, SLT=2, SLTU=3, SRA=0x40005030, SRL=0x5030 };
+
 const OP_LOAD = enum(u3) { LB = 0, LH = 1, LW = 2, LBU = 4, LHU = 5 };
 
 const OP_STORE = enum(u3) { SB = 0, SH = 1, SW = 2 };
 
-fn disassembly(command: u32, kind: KIND) void {
-    // const opcode: u3 = @truncate(command >> 12);
-    // const rd: u5 = @truncate(command >> 7);
-    // const rs1: u5 = @truncate(command >> 15);
-    // const op_enum: OP_R_I = @fromBackingInt(@intCast(opcode));
-    // const instru = @tagName(op_enum);
-    // print("{X:0>4}: ", .{pc});
-    // if (kind == KIND.R) {
-    //     const rs2: u5 = @truncate(command >> 20);
-    //     print("{s} r{d}, r{d}, r{d} ", .{ instru, rd, rs1, rs2 });
-    // } else if (kind == KIND.I) {
-    //     const imm12: u12 = @truncate(command >> 20);
-    //     const imm: i12 = @bitCast(imm12);
-    //     print("{s} r{d}, r{d}, #{d} ", .{ instru, rd, rs1, imm });
-    // }
-    _ = command;
-    _ = kind;
-    return;
+fn disassembly(command: INSTRUCTION, flag: u1) void {
+    const opcode: u32 = @bitCast(command);
+    const op_enum: OP_R = @fromBackingInt(opcode);
+    const tag = @tagName(op_enum);
+    print("{X:0>4}: ", .{pc});
+    if (command.R.func7 == 0x33){
+        print("{s} r{d}, r{d}, r{d} ", .{ tag, command.R.rd, command.R.rs1, command.R.rs2 });
+    }
+    else {
+        print("{s} r{d}, r{d}, #{d} ", .{ tag, command.I.rd, command.I.rs1, command.I.get_imm() });
+    }
+    _ = flag;
 }
 
 fn packing_data(instr: []const u8, little_endian: bool) u32 {
@@ -272,27 +268,100 @@ fn decode(instr: []const u8, little_endian: bool) void {
     const instruction: INSTRUCTION = @bitCast(std.mem.readInt(u32, instr, little_endian));
     switch (instruction.R.opcode) {
         0x33 => {
-            //R
+            disassembly(instruction, 0);
             switch (instruction.R.func3) {
-                0 => {
-                    op_R(instruction, add);
+                0 => 
+                {
+                    if (instruction.R.func7 == 0x20){
+                        op_R(instruction, add);
+                    }
+                    else{
+                        op_R(instruction, add);
+                    }
+                },
+                1 => {
+                    op_R(instruction, sll);
+                },
+                2 => {
+                    op_R(instruction, slt);
+                },
+                3 => {
+                    op_R(instruction, sltu);
+                },
+                4 => {
+                    op_R(instruction, xor);
+                },
+                5 => {
+                    if (instruction.R.func7 == 0x20){
+                        op_R(instruction, sra);
+                    }
+                    else{
+                        op_R(instruction, srl);
+                    }
+                },
+                6 => {
+                    op_R(instruction, or_);
+                },
+                7 => {
+                    op_R(instruction, and_);
                 },
             }
         },
         0x13, 0x3, 0x67, 0x73, 0x0f => {
-            //I
+            disassembly(instruction, 1);
+            switch (instruction.I.func3) {
+                0 => 
+                {
+                    if (instruction.I.func7 == 0x20){
+                        op_I(instruction, add);
+                    }
+                    else{
+                        op_I(instruction, add);
+                    }
+                },
+                1 => {
+                    op_I(instruction, sll);
+                },
+                2 => {
+                    op_I(instruction, slt);
+                },
+                3 => {
+                    op_I(instruction, sltu);
+                },
+                4 => {
+                    op_I(instruction, xor);
+                },
+                5 => {
+                    if (instruction.R.func7 == 0x20){
+                        op_I(instruction, sra);
+                    }
+                    else{
+                        op_I(instruction, srl);
+                    }
+                },
+                6 => {
+                    op_I(instruction, or_);
+                },
+                7 => {
+                    op_I(instruction, and_);
+                },
+            }
         },
         0x63 => {
             //B
+            print("NOP", .{});
         },
         0x23 => {
             //S
+            print("NOP", .{});
         },
         0x37, 0x17 => {
             //U
+            print("NOP", .{});
         },
         0x6f => {
             //J
+            print("NOP", .{});
         },
         else => {
             print("OPCODE UNKNOWN", .{});
@@ -315,8 +384,7 @@ pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
     const args = try init.minimal.args.toSlice(arena);
     const opener = std.Io.Dir.cwd();
-    var ram: [0x1000]u8 = undefined;
-    @memset(&ram, 0);
+    var ram: [0x1000]u8 = @splat(0);
     const file = try opener.openFile(init.io, args[1], .{});
     defer file.close(init.io);
     const stat = try file.stat(init.io);
