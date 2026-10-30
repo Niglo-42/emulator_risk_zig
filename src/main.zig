@@ -21,11 +21,11 @@ fn op_I(instr: I, f: fn (u32, u32) u32) void {
 }
 
 pub fn add(a: u32, b: u32) u32 {
-    return a + b;
+    return a +% b;
 }
 
 pub fn sub(a: u32, b: u32) u32 {
-    return a - b;
+    return a -% b;
 }
 
 pub fn xor(a: u32, b: u32) u32 {
@@ -104,10 +104,12 @@ fn disassembly(command: INSTRUCTION, flag: u1) void {
     };
 
     print("{X:0>4}: ", .{pc});
-    if (command.R.func7 == 0x33) {
-        print("{s} r{d}, r{d}, r{d} \n", .{ tag, command.R.rd, command.R.rs1, command.R.rs2 });
+    if (command.R.opcode == 0x33) {
+        print("{s} r{d}, r{d}, r{d} \n", .{ tag,
+        command.R.rd, command.R.rs1, command.R.rs2 });
     } else {
-        print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.I.rd, command.I.rs1, command.I.get_imm() });
+        print("{s} r{d}, r{d}, #{d} \n", .{ tag,
+        command.I.rd, command.I.rs1, @as(i32, @bitCast(command.I.get_imm())) });
     }
     _ = flag;
 }
@@ -248,16 +250,15 @@ const J = packed struct(u32) {
     }
 };
 
-fn decode(instr: []const u8, little_endian: bool) void {
-    const endian = if (little_endian) std.lang.Endian.little else std.lang.Endian.big;
-    const instruction: INSTRUCTION = @bitCast(std.mem.readInt(u32, instr[0..4], endian));
+fn decode(instr: []const u8) void {
+    const instruction: INSTRUCTION = @bitCast(std.mem.readInt(u32, instr[0..4], std.builtin.Endian.little));
     switch (instruction.R.opcode) {
         0x33 => {
             disassembly(instruction, 0);
             switch (instruction.R.func3) {
                 0 => {
                     if (instruction.R.func7 == 0x20) {
-                        op_R(instruction.R, add);
+                        op_R(instruction.R, sub);
                     } else {
                         op_R(instruction.R, add);
                     }
@@ -289,7 +290,7 @@ fn decode(instr: []const u8, little_endian: bool) void {
                 },
             }
         },
-        0x13, 0x3, 0x67, 0x73, 0x0f => {
+        0x13 => {
             disassembly(instruction, 1);
             switch (instruction.I.func3) {
                 0 => {
@@ -343,7 +344,7 @@ fn decode(instr: []const u8, little_endian: bool) void {
             print("NOP", .{});
         },
         else => {
-            print("OPCODE UNKNOWN", .{});
+            print("OPCODE UNKNOWN \n", .{});
         },
     }
 }
@@ -352,7 +353,7 @@ fn fetch_mem(ram: []u8, buffer: []u8, instr_size: u8, buf_len: u64) void {
     while (pc < buf_len) : (pc += instr_size) {
         const end = @min(pc + instr_size, buf_len);
         const instr = buffer[pc..end];
-        decode(instr, true);
+        decode(instr);
     }
     print_regs();
     _ = ram[0];
