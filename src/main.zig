@@ -2,6 +2,7 @@ const std = @import("std");
 const print = std.debug.print;
 
 var regs: [32]u32 = @splat(0);
+var ram: [0x1000]u8 = @splat(0);
 var pc: u32 = 0;
 
 fn print_regs() void {
@@ -18,6 +19,26 @@ fn op_R(instr: R, f: fn (u32, u32) u32) void {
 
 fn op_I(instr: I, f: fn (u32, u32) u32) void {
     regs[instr.rd] = f(regs[instr.rs1], instr.get_imm());
+}
+
+fn op_load(instr: I) void {
+    const mask: u32 = switch (instr.func3) {
+        0, 4 => 0xff,
+        1, 5 => 0xffff,
+        2 => 0xffffffff,
+        else => 0xffffffff,
+    };
+    regs[instr.rd] = ram[regs[instr.rs1] + instr.get_imm()] & mask;
+}
+
+fn op_S(instr: S) void {
+    const mask: u32 = switch (instr.func3) {
+        0 => 0xff,
+        1 => 0xffff,
+        2 => 0xffffffff,
+        else => 0xffffffff,
+    };
+    ram[regs[instr.rs1] + instr.get_imm()] = regs[instr.rs2] & mask;
 }
 
 pub fn add(a: u32, b: u32) u32 {
@@ -325,13 +346,15 @@ fn decode(instr: []const u8) void {
                 },
             }
         },
+        3 => {
+            op_load(instruction.I);
+        },
         0x63 => {
             //B
             print("NOP", .{});
         },
         0x23 => {
-            //S
-            print("NOP", .{});
+            op_S(instruction.S);
         },
         0x37, 0x17 => {
             //U
@@ -347,21 +370,19 @@ fn decode(instr: []const u8) void {
     }
 }
 
-fn fetch_mem(ram: []u8, buffer: []u8, instr_size: u8, buf_len: u64) void {
+fn fetch_mem(buffer: []u8, instr_size: u8, buf_len: u64) void {
     while (pc < buf_len) : (pc += instr_size) {
         const end = @min(pc + instr_size, buf_len);
         const instr = buffer[pc..end];
         decode(instr);
     }
     print_regs();
-    _ = ram[0];
 }
 
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
     const args = try init.minimal.args.toSlice(arena);
     const opener = std.Io.Dir.cwd();
-    var ram: [0x1000]u8 = @splat(0);
     const file = try opener.openFile(init.io, args[1], .{});
     defer file.close(init.io);
     const stat = try file.stat(init.io);
