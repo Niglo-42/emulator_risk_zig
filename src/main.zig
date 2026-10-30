@@ -80,10 +80,8 @@ pub fn not_(a: u32) u32 {
 
 fn disassembly(command: INSTRUCTION, flag: u1) void {
     const func7 = command.R.func7;
-    const tag: []const u8 = switch (func7) 
-    {
-        0x20 => switch (command.R.func3) 
-        {
+    const tag: []const u8 = switch (func7) {
+        0x20 => switch (command.R.func3) {
             0 => "sub",
             1 => "sll",
             2 => "slt",
@@ -91,10 +89,9 @@ fn disassembly(command: INSTRUCTION, flag: u1) void {
             4 => "xor",
             5 => "sra",
             6 => "or",
-            7 => "and"
+            7 => "and",
         },
-        else =>  switch (command.R.func3) 
-        {
+        else => switch (command.R.func3) {
             0 => "add",
             1 => "sll",
             2 => "slt",
@@ -102,17 +99,15 @@ fn disassembly(command: INSTRUCTION, flag: u1) void {
             4 => "xor",
             5 => "srl",
             6 => "or",
-            7 => "and"
+            7 => "and",
         },
     };
-    
+
     print("{X:0>4}: ", .{pc});
     if (command.R.func7 == 0x33) {
-        print("{s} r{d}, r{d}, r{d} \n",
-        .{ tag, command.R.rd, command.R.rs1, command.R.rs2 });
+        print("{s} r{d}, r{d}, r{d} \n", .{ tag, command.R.rd, command.R.rs1, command.R.rs2 });
     } else {
-        print("{s} r{d}, r{d}, #{d} \n",
-        .{ tag, command.I.rd, command.I.rs1, command.I.get_imm() });
+        print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.I.rd, command.I.rs1, command.I.get_imm() });
     }
     _ = flag;
 }
@@ -187,9 +182,9 @@ const I = packed struct(u32) {
     imm: u12,
 
     fn get_imm(self: I) u32 {
-        var imm = I_imm{ .imm0_11 = self.imm, .imm12_31 = @as(u20, 0)};
+        var imm = I_imm{ .imm0_11 = self.imm, .imm12_31 = @as(u20, 0) };
         if (self.imm >> 11 == 1) {
-            imm.imm12_31 = std.math.maxInt(u19);
+            imm.imm12_31 = std.math.maxInt(u20);
         }
         return @bitCast(imm);
     }
@@ -205,7 +200,6 @@ const S = packed struct(u32) {
 
     fn get_imm(self: S) u32 {
         var imm = S_imm{
-            .imm0 = @as(u1, 0),
             .imm0_4 = self.imm0_4,
             .imm5_11 = self.imm11_5,
             .imm12_31 = @as(u20, 0),
@@ -256,10 +250,7 @@ const J = packed struct(u32) {
 
 fn decode(instr: []const u8, little_endian: bool) void {
     const endian = if (little_endian) std.lang.Endian.little else std.lang.Endian.big;
-    const instruction: INSTRUCTION = @bitCast(std.mem.readInt(
-        u32,
-        instr[0..4],  endian
-    ));
+    const instruction: INSTRUCTION = @bitCast(std.mem.readInt(u32, instr[0..4], endian));
     switch (instruction.R.opcode) {
         0x33 => {
             disassembly(instruction, 0);
