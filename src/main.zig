@@ -12,12 +12,12 @@ fn print_regs() void {
     print("\n", .{});
 }
 
-fn op_R(instr: INSTRUCTION.R, f: fn (u32, u32) u32) void {
+fn op_R(instr: R, f: fn (u32, u32) u32) void {
     regs[instr.rd] = f(regs[instr.rs1], regs[instr.rs2]);
 }
 
-fn op_I(instr: INSTRUCTION.I, f: fn (u32, u32) u32) void {
-    regs[instr.rd] = f(regs[instr.rs1], regs[instr.get_imm()]);
+fn op_I(instr: I, f: fn (u32, u32) u32) void {
+    regs[instr.rd] = f(regs[instr.rs1], instr.get_imm());
 }
 
 pub fn add(a: u32, b: u32) u32 {
@@ -78,53 +78,43 @@ pub fn not_(a: u32) u32 {
     return ~a;
 }
 
-const KIND = enum(u7) {
-    R = 0x33,
-    I = 0x13,
-    B = 0x63,
-    J = 0x6f,
-    // SYSCALL = 0x73, DONC 0X70
-    S = 0x23,
-    // LOAD = 0x03, DONC 0
-    U = 0x07,
-};
-
-const OP_R = enum(u32) { ADD=0, SUB=0, AND=7, OR=6, XOR=4, SLL=1, SLT=2, SLTU=3, SRA=0x40005030, SRL=0x5030 };
-
-const OP_LOAD = enum(u3) { LB = 0, LH = 1, LW = 2, LBU = 4, LHU = 5 };
-
-const OP_STORE = enum(u3) { SB = 0, SH = 1, SW = 2 };
-
 fn disassembly(command: INSTRUCTION, flag: u1) void {
-    const opcode: u32 = @bitCast(command);
-    const op_enum: OP_R = @fromBackingInt(opcode);
-    const tag = @tagName(op_enum);
+    const func7 = command.R.func7;
+    const tag: []const u8 = switch (func7) 
+    {
+        0x20 => switch (command.R.func3) 
+        {
+            0 => "sub",
+            1 => "sll",
+            2 => "slt",
+            3 => "sltu",
+            4 => "xor",
+            5 => "sra",
+            6 => "or",
+            7 => "and"
+        },
+        else =>  switch (command.R.func3) 
+        {
+            0 => "add",
+            1 => "sll",
+            2 => "slt",
+            3 => "sltu",
+            4 => "xor",
+            5 => "srl",
+            6 => "or",
+            7 => "and"
+        },
+    };
+    
     print("{X:0>4}: ", .{pc});
-    if (command.R.func7 == 0x33){
-        print("{s} r{d}, r{d}, r{d} ", .{ tag, command.R.rd, command.R.rs1, command.R.rs2 });
-    }
-    else {
-        print("{s} r{d}, r{d}, #{d} ", .{ tag, command.I.rd, command.I.rs1, command.I.get_imm() });
+    if (command.R.func7 == 0x33) {
+        print("{s} r{d}, r{d}, r{d} \n",
+        .{ tag, command.R.rd, command.R.rs1, command.R.rs2 });
+    } else {
+        print("{s} r{d}, r{d}, #{d} \n",
+        .{ tag, command.I.rd, command.I.rs1, command.I.get_imm() });
     }
     _ = flag;
-}
-
-fn packing_data(instr: []const u8, little_endian: bool) u32 {
-    var command: u32 = 0;
-    if (little_endian) {
-        for (0..4) |i| {
-            var b: u32 = instr[i];
-            const shift: u5 = @truncate(i * 8);
-            b <<= shift;
-            command |= b;
-        }
-    } else {
-        for (instr) |byte| {
-            command <<= 8;
-            command |= byte;
-        }
-    }
-    return command;
 }
 
 const INSTRUCTION = packed union { R: R, I: I, S: S, U: U, B: B, J: J };
@@ -174,7 +164,7 @@ const B = packed struct(u32) {
     imm12: u1,
 
     fn get_imm(self: B) u32 {
-        const imm = B_imm{
+        var imm = B_imm{
             .imm0 = @as(u1, 0),
             .imm1_4 = self.imm1_4,
             .imm5_10 = self.imm5_10,
@@ -197,7 +187,7 @@ const I = packed struct(u32) {
     imm: u12,
 
     fn get_imm(self: I) u32 {
-        const imm = I_imm{ .imm0_11 = self.imm, .imm12_31 = @as(u20, 0) };
+        var imm = I_imm{ .imm0_11 = self.imm, .imm12_31 = @as(u20, 0)};
         if (self.imm >> 11 == 1) {
             imm.imm12_31 = std.math.maxInt(u19);
         }
@@ -214,7 +204,7 @@ const S = packed struct(u32) {
     imm11_5: u7,
 
     fn get_imm(self: S) u32 {
-        const imm = S_imm{
+        var imm = S_imm{
             .imm0 = @as(u1, 0),
             .imm0_4 = self.imm0_4,
             .imm5_11 = self.imm11_5,
@@ -250,7 +240,7 @@ const J = packed struct(u32) {
     imm31: u1,
 
     fn get_imm(self: J) u32 {
-        const imm = J_imm{
+        var imm = J_imm{
             .imm0 = @as(u1, 0),
             .imm1_10 = self.imm21_30,
             .imm11 = self.imm20,
@@ -265,85 +255,83 @@ const J = packed struct(u32) {
 };
 
 fn decode(instr: []const u8, little_endian: bool) void {
-    const instruction: INSTRUCTION = @bitCast(std.mem.readInt(u32, instr, little_endian));
+    const endian = if (little_endian) std.lang.Endian.little else std.lang.Endian.big;
+    const instruction: INSTRUCTION = @bitCast(std.mem.readInt(
+        u32,
+        instr[0..4],  endian
+    ));
     switch (instruction.R.opcode) {
         0x33 => {
             disassembly(instruction, 0);
             switch (instruction.R.func3) {
-                0 => 
-                {
-                    if (instruction.R.func7 == 0x20){
-                        op_R(instruction, add);
-                    }
-                    else{
-                        op_R(instruction, add);
+                0 => {
+                    if (instruction.R.func7 == 0x20) {
+                        op_R(instruction.R, add);
+                    } else {
+                        op_R(instruction.R, add);
                     }
                 },
                 1 => {
-                    op_R(instruction, sll);
+                    op_R(instruction.R, sll);
                 },
                 2 => {
-                    op_R(instruction, slt);
+                    op_R(instruction.R, slt);
                 },
                 3 => {
-                    op_R(instruction, sltu);
+                    op_R(instruction.R, sltu);
                 },
                 4 => {
-                    op_R(instruction, xor);
+                    op_R(instruction.R, xor);
                 },
                 5 => {
-                    if (instruction.R.func7 == 0x20){
-                        op_R(instruction, sra);
-                    }
-                    else{
-                        op_R(instruction, srl);
+                    if (instruction.R.func7 == 0x20) {
+                        op_R(instruction.R, sra);
+                    } else {
+                        op_R(instruction.R, srl);
                     }
                 },
                 6 => {
-                    op_R(instruction, or_);
+                    op_R(instruction.R, or_);
                 },
                 7 => {
-                    op_R(instruction, and_);
+                    op_R(instruction.R, and_);
                 },
             }
         },
         0x13, 0x3, 0x67, 0x73, 0x0f => {
             disassembly(instruction, 1);
             switch (instruction.I.func3) {
-                0 => 
-                {
-                    if (instruction.I.func7 == 0x20){
-                        op_I(instruction, add);
-                    }
-                    else{
-                        op_I(instruction, add);
+                0 => {
+                    if (instruction.R.func7 == 0x20) {
+                        op_I(instruction.I, add);
+                    } else {
+                        op_I(instruction.I, add);
                     }
                 },
                 1 => {
-                    op_I(instruction, sll);
+                    op_I(instruction.I, sll);
                 },
                 2 => {
-                    op_I(instruction, slt);
+                    op_I(instruction.I, slt);
                 },
                 3 => {
-                    op_I(instruction, sltu);
+                    op_I(instruction.I, sltu);
                 },
                 4 => {
-                    op_I(instruction, xor);
+                    op_I(instruction.I, xor);
                 },
                 5 => {
-                    if (instruction.R.func7 == 0x20){
-                        op_I(instruction, sra);
-                    }
-                    else{
-                        op_I(instruction, srl);
+                    if (instruction.R.func7 == 0x20) {
+                        op_I(instruction.I, sra);
+                    } else {
+                        op_I(instruction.I, srl);
                     }
                 },
                 6 => {
-                    op_I(instruction, or_);
+                    op_I(instruction.I, or_);
                 },
                 7 => {
-                    op_I(instruction, and_);
+                    op_I(instruction.I, and_);
                 },
             }
         },
@@ -369,8 +357,7 @@ fn decode(instr: []const u8, little_endian: bool) void {
     }
 }
 
-fn fetch_mem(ram: []u8, buffer: []u8, instr_size: u8) void {
-    const buf_len = buffer.len();
+fn fetch_mem(ram: []u8, buffer: []u8, instr_size: u8, buf_len: u64) void {
     while (pc < buf_len) : (pc += instr_size) {
         const end = @min(pc + instr_size, buf_len);
         const instr = buffer[pc..end];
@@ -395,5 +382,5 @@ pub fn main(init: std.process.Init) !void {
     if (n != size) {
         print("hoho problemo", .{});
     }
-    fetch_mem(&ram, buffer, 4);
+    fetch_mem(&ram, buffer, 4, size);
 }
