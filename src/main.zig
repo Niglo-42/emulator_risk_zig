@@ -105,11 +105,9 @@ fn disassembly(command: INSTRUCTION, flag: u1) void {
 
     print("{X:0>4}: ", .{pc});
     if (command.R.opcode == 0x33) {
-        print("{s} r{d}, r{d}, r{d} \n", .{ tag,
-        command.R.rd, command.R.rs1, command.R.rs2 });
+        print("{s} r{d}, r{d}, r{d} \n", .{ tag, command.R.rd, command.R.rs1, command.R.rs2 });
     } else {
-        print("{s} r{d}, r{d}, #{d} \n", .{ tag,
-        command.I.rd, command.I.rs1, @as(i32, @bitCast(command.I.get_imm())) });
+        print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.I.rd, command.I.rs1, @as(i32, @bitCast(command.I.get_imm())) });
     }
     _ = flag;
 }
