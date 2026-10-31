@@ -67,63 +67,63 @@ with open("bin.bin", "wb") as file:
         # sh x2, 8(x1)
         b"\x23\x94\x20\x00"
         # sb x2, 12(x1)
-        # b"\x23\x86\x20\x00"
-        # # sw x2, 100(x1)
-        # b"\x23\xa2\x20\x06"
-        # # addi x4, x1, 64
-        # b"\x13\x82\x00\x04"
-        # # sb x2, -1(x4)
-        # b"\xa3\x0f\x22\xfe"
-        # # sh x2, -6(x4)
-        # b"\x23\x1d\x22\xfe"
-        # # sw x2, -12(x4)
-        # b"\x23\x2a\x22\xfe"
-        # # sw x5, 16(x1)
-        # b"\x23\xa8\x50\x00"
-        # # sb x0, 17(x1)
-        # b"\xa3\x88\x00\x00"
-        # # sw x5, 20(x1)
-        # b"\x23\xaa\x50\x00"
-        # # sh x0, 22(x1)
-        # b"\x23\x9b\x00\x00"
-        # # lw x10, 0(x1)
-        # b"\x03\xa5\x00\x00"
-        # # lb x11, 0(x1)
-        # b"\x83\x85\x00\x00"
-        # # lbu x12, 0(x1)
-        # b"\x03\xc6\x00\x00"
-        # # lb x13, 1(x1)
-        # b"\x83\x86\x10\x00"
-        # # lb x14, 3(x1)
-        # b"\x03\x87\x30\x00"
-        # # lbu x15, 3(x1)
-        # b"\x83\xc7\x30\x00"
-        # # lh x16, 0(x1)
-        # b"\x03\x98\x00\x00"
-        # # lhu x17, 0(x1)
-        # b"\x83\xd8\x00\x00"
-        # # lh x18, 2(x1)
-        # b"\x03\x99\x20\x00"
-        # # lhu x19, 2(x1)
-        # b"\x83\xd9\x20\x00"
-        # # lw x20, 100(x1)
-        # b"\x03\xaa\x40\x06"
-        # # lw x21, 8(x1)
-        # b"\x83\xaa\x80\x00"
-        # # lw x22, 12(x1)
-        # b"\x03\xab\xc0\x00"
-        # # lb x23, -1(x4)
-        # b"\x83\x0b\xf2\xff"
-        # # lh x24, -6(x4)
-        # b"\x03\x1c\xa2\xff"
-        # # lw x25, -12(x4)
-        # b"\x83\x2c\x42\xff"
-        # # lw x26, 16(x1)
-        # b"\x03\xad\x00\x01"
-        # # lw x27, 20(x1)
-        # b"\x83\xad\x40\x01"
-        # # lw x0, 0(x1)         (x0 doit rester à 0)
-        # b"\x03\xa0\x00\x00"
+        b"\x23\x86\x20\x00"
+        # sw x2, 100(x1)
+        b"\x23\xa2\x20\x06"
+        # addi x4, x1, 64
+        b"\x13\x82\x00\x04"
+        # sb x2, -1(x4)
+        b"\xa3\x0f\x22\xfe"
+        # sh x2, -6(x4)
+        b"\x23\x1d\x22\xfe"
+        # sw x2, -12(x4)
+        b"\x23\x2a\x22\xfe"
+        # sw x5, 16(x1)
+        b"\x23\xa8\x50\x00"
+        # sb x0, 17(x1)
+        b"\xa3\x88\x00\x00"
+        # sw x5, 20(x1)
+        b"\x23\xaa\x50\x00"
+        # sh x0, 22(x1)
+        b"\x23\x9b\x00\x00"
+        # lw x10, 0(x1)
+        b"\x03\xa5\x00\x00"
+        # lb x11, 0(x1)
+        b"\x83\x85\x00\x00"
+        # lbu x12, 0(x1)
+        b"\x03\xc6\x00\x00"
+        # lb x13, 1(x1)
+        b"\x83\x86\x10\x00"
+        # lb x14, 3(x1)
+        b"\x03\x87\x30\x00"
+        # lbu x15, 3(x1)
+        b"\x83\xc7\x30\x00"
+        # lh x16, 0(x1)
+        b"\x03\x98\x00\x00"
+        # lhu x17, 0(x1)
+        b"\x83\xd8\x00\x00"
+        # lh x18, 2(x1)
+        b"\x03\x99\x20\x00"
+        # lhu x19, 2(x1)
+        b"\x83\xd9\x20\x00"
+        # lw x20, 100(x1)
+        b"\x03\xaa\x40\x06"
+        # lw x21, 8(x1)
+        b"\x83\xaa\x80\x00"
+        # lw x22, 12(x1)
+        b"\x03\xab\xc0\x00"
+        # lb x23, -1(x4)
+        b"\x83\x0b\xf2\xff"
+        # lh x24, -6(x4)
+        b"\x03\x1c\xa2\xff"
+        # lw x25, -12(x4)
+        b"\x83\x2c\x42\xff"
+        # lw x26, 16(x1)
+        b"\x03\xad\x00\x01"
+        # lw x27, 20(x1)
+        b"\x83\xad\x40\x01"
+        # lw x0, 0(x1)         (x0 doit rester à 0)
+        b"\x03\xa0\x00\x00"
     )
 
     file.write(buf)

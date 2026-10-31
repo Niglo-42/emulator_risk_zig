@@ -27,13 +27,36 @@ fn fetch_ram(addr: u32) u32 {
 }
 
 fn op_load(instr: I) void {
+    if (instr.rd == 0){
+        return ;
+    }
     const mask: u32 = switch (instr.func3) {
         0, 4 => 0xff,
         1, 5 => 0xffff,
         2 => 0xffffffff,
         else => 0xffffffff,
     };
-    regs[instr.rd] = fetch_ram(regs[instr.rs1] + instr.get_imm()) & mask;
+    const data = fetch_ram(regs[instr.rs1] +% instr.get_imm()) & mask;
+    if (instr.func3 > 3) // si unsigned
+    {
+        regs[instr.rd] = data;
+    } else {
+        switch (instr.func3) {
+            0 => {
+                if (data >= 0x80) {
+                    regs[instr.rd] = data | ~mask;
+                }
+            },
+            1 => {
+                if (data >= 0x8000) {
+                    regs[instr.rd] = data | ~mask;
+                }
+            },
+            else => {
+                regs[instr.rd] = data;
+            },
+        }
+    }
 }
 
 fn op_S(instr: S) void {
@@ -43,9 +66,12 @@ fn op_S(instr: S) void {
         2 => 4,
         else => 4,
     };
-    const addr = regs[instr.rs1] + instr.get_imm();
+    const addr = regs[instr.rs1] +% instr.get_imm();
     for (0..mask) |i| {
         const idx: u5 = @truncate(i);
+        if (instr.rs2 == 0){
+            ram[addr + i] = 0;
+        }
         ram[addr + i] = @truncate(regs[instr.rs2] >> @as(u5, (mask - 1 - idx) * 8));
     }
 }
@@ -182,6 +208,14 @@ fn disassembly(command: INSTRUCTION) void {
             2 => "sw",
             else => "invalid store",
         },
+        0x3 => switch (command.R.func3) { //load I
+            0 => "lb",
+            1 => "lh",
+            2 => "lw",
+            4 => "lbu",
+            5 => "lhu",
+            else => "invalid load",
+        },
         else => "invalid type",
     };
 
@@ -198,6 +232,8 @@ fn disassembly(command: INSTRUCTION) void {
         print("{s} r{d}, #{d} \n", .{ tag, command.J.rd, @as(i32, @bitCast(command.S.get_imm())) });
     } else if (command.R.opcode == 0x37 or command.R.opcode == 0x17) {
         print("{s} r{d}, #{d} \n", .{ tag, command.U.rd, @as(i32, @bitCast(command.S.get_imm())) });
+    } else if (command.R.opcode == 0x3) {
+        print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.I.rd, command.I.rs1, @as(i32, @bitCast(command.S.get_imm())) });
     } else {
         print("unrecognized arg", .{});
     }
