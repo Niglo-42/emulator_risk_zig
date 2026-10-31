@@ -22,11 +22,6 @@ fn op_I(instr: I, f: fn (u32, u32) u32) void {
 }
 
 fn fetch_ram(addr: u32) u32 {
-    // ici je mets en big endian CAR cela preserve l'ordre des octets REEL
-    // donc [12, 13, 14, 15] -> 12131415 et si je veux lb
-    // je prends bien 121321415 & 0xff #camoulox
-    // mais cela change mon abi donc je remet en little
-    // # camoulox--
     const word: []u8 = ram[addr .. addr + 4];
     return std.mem.readInt(u32, word[0..4], std.builtin.Endian.little);
 }
@@ -36,21 +31,19 @@ fn op_load(instr: I) void {
         return;
     }
     const mask: u32 = switch (instr.func3) {
-        0 => 0xff,
-        1 => 0xffff,
+        0, 4 => 0xff,
+        1, 5 => 0xffff,
         2 => 0xffffffff,
-        else => 4,
+        else => 0xffffffff,
     };
     const data = fetch_ram(regs[instr.rs1] +% instr.get_imm()) & mask;
-    print("apres fetch = {X}\n", .{data});
-    print("REG = {X}\n", .{regs[instr.rd]});
 
-    if (instr.func3 > 3) // si unsigned
+    if (instr.func3 > 1) // si unsigned
     {
-        regs[instr.rd] = data & mask;
+        regs[instr.rd] = data;
     } else {
         if (instr.func3 == 0) {
-            if (data >= 128) {
+            if (data >= 0x80) {
                 regs[instr.rd] = 0xffffff00 | data;
             } else {
                 regs[instr.rd] = data;
@@ -65,7 +58,6 @@ fn op_load(instr: I) void {
             regs[instr.rd] = data;
         }
     }
-    print("REG = {X}\n", .{regs[instr.rd]});
 }
 
 fn op_S(instr: S) void {
@@ -86,42 +78,50 @@ fn op_S(instr: S) void {
     }
 }
 
-fn op_B(instr: B) void {
+fn op_B(instr: B) bool {
     switch (instr.func3) {
         0 => { // beq
             if (@as(i32, @bitCast(regs[instr.rs1])) == @as(i32, @bitCast(regs[instr.rs2]))) {
-                pc += instr.get_imm();
+                pc = pc +% instr.get_imm();
+                return true;
             }
         },
         1 => { // bne
             if (@as(i32, @bitCast(regs[instr.rs1])) != @as(i32, @bitCast(regs[instr.rs2]))) {
-                pc += instr.get_imm();
+                pc = pc +% instr.get_imm();
+                return true;
             }
         },
         4 => { //blt
             if (@as(i32, @bitCast(regs[instr.rs1])) < @as(i32, @bitCast(regs[instr.rs2]))) {
-                pc += instr.get_imm();
+                pc = pc +% instr.get_imm();
+                return true;
             }
         },
         5 => { //bge
             if (@as(i32, @bitCast(regs[instr.rs1])) >= @as(i32, @bitCast(regs[instr.rs2]))) {
-                pc += instr.get_imm();
+                pc = pc +% instr.get_imm();
+                return true;
             }
         },
         6 => { //bltu
             if (regs[instr.rs1] < regs[instr.rs2]) {
-                pc += instr.get_imm();
+                pc = pc +% instr.get_imm();
+                return true;
             }
         },
         7 => { //bgeu
             if (regs[instr.rs1] >= regs[instr.rs2]) {
-                pc += instr.get_imm();
+                pc = pc +% instr.get_imm();
+                return true;
             }
         },
         else => {
             print("branch not found", .{});
+            return false;
         },
     }
+    return false;
 }
 
 pub fn add(a: u32, b: u32) u32 {
@@ -226,6 +226,15 @@ fn disassembly(command: INSTRUCTION) void {
             5 => "lhu",
             else => "invalid load",
         },
+        0x63 => switch (command.R.func3) {
+            0 => "beq",
+            1 => "bne",
+            4 => "blt",
+            5 => "bge",
+            6 => "bltu",
+            7 => "bgeu",
+            else => "invalid branch",
+        },
         else => "invalid type",
     };
 
@@ -235,15 +244,15 @@ fn disassembly(command: INSTRUCTION) void {
     } else if (command.R.opcode == 0x13) {
         print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.I.rd, command.I.rs1, @as(i32, @bitCast(command.I.get_imm())) });
     } else if (command.R.opcode == 0x23) {
-        print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.S.rs1, command.S.rs2, @as(i32, @bitCast(command.S.get_imm())) });
+        print("{s} x{d}, {d}(x{d}) \n", .{ tag, command.S.rs1, @as(i32, @bitCast(command.S.get_imm())), command.S.rs2 });
     } else if (command.R.opcode == 0x63) {
-        print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.B.rs1, command.S.rs2, @as(i32, @bitCast(command.S.get_imm())) });
+        print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.B.rs1, command.B.rs2, @as(i32, @bitCast(command.B.get_imm())) });
     } else if (command.R.opcode == 0x64 or command.R.opcode == 0x6f) {
-        print("{s} r{d}, #{d} \n", .{ tag, command.J.rd, @as(i32, @bitCast(command.S.get_imm())) });
+        print("{s} r{d}, #{d} \n", .{ tag, command.J.rd, @as(i32, @bitCast(command.J.get_imm())) });
     } else if (command.R.opcode == 0x37 or command.R.opcode == 0x17) {
-        print("{s} r{d}, #{d} \n", .{ tag, command.U.rd, @as(i32, @bitCast(command.S.get_imm())) });
+        print("{s} r{d}, #{d} \n", .{ tag, command.U.rd, @as(i32, @bitCast(command.U.get_imm())) });
     } else if (command.R.opcode == 0x3) {
-        print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.I.rd, command.I.rs1, @as(i32, @bitCast(command.S.get_imm())) });
+        print("{s} x{d}, {d}(x{d}) \n", .{ tag, command.I.rd, @as(i32, @bitCast(command.I.get_imm())), command.I.rs1 });
     } else {
         print("unrecognized arg", .{});
     }
@@ -388,6 +397,7 @@ const J = packed struct(u32) {
 fn decode(instr: []const u8) void {
     const instruction: INSTRUCTION = @bitCast(std.mem.readInt(u32, instr[0..4], std.builtin.Endian.little));
     disassembly(instruction);
+    var flag = false;
     switch (instruction.R.opcode) {
         0x33 => {
             switch (instruction.R.func3) {
@@ -466,7 +476,7 @@ fn decode(instr: []const u8) void {
         },
         0x63 => {
             //B
-            op_B(instruction.B);
+            flag = op_B(instruction.B);
         },
         0x23 => {
             op_S(instruction.S);
@@ -483,10 +493,13 @@ fn decode(instr: []const u8) void {
             print("OPCODE UNKNOWN \n", .{});
         },
     }
+    if (flag == false) {
+        pc += 4;
+    }
 }
 
 fn fetch_mem(buffer: []u8, instr_size: u8, buf_len: u64) void {
-    while (pc < buf_len) : (pc += instr_size) {
+    while (pc < buf_len) {
         const end = @min(pc + instr_size, buf_len);
         const instr = buffer[pc..end];
         decode(instr);
