@@ -22,41 +22,50 @@ fn op_I(instr: I, f: fn (u32, u32) u32) void {
 }
 
 fn fetch_ram(addr: u32) u32 {
+    // ici je mets en big endian CAR cela preserve l'ordre des octets REEL
+    // donc [12, 13, 14, 15] -> 12131415 et si je veux lb
+    // je prends bien 121321415 & 0xff #camoulox
+    // mais cela change mon abi donc je remet en little
+    // # camoulox--
     const word: []u8 = ram[addr .. addr + 4];
     return std.mem.readInt(u32, word[0..4], std.builtin.Endian.little);
 }
 
 fn op_load(instr: I) void {
-    if (instr.rd == 0){
-        return ;
+    if (instr.rd == 0) {
+        return;
     }
     const mask: u32 = switch (instr.func3) {
-        0, 4 => 0xff,
-        1, 5 => 0xffff,
+        0 => 0xff,
+        1 => 0xffff,
         2 => 0xffffffff,
-        else => 0xffffffff,
+        else => 4,
     };
     const data = fetch_ram(regs[instr.rs1] +% instr.get_imm()) & mask;
+    print("apres fetch = {X}\n", .{data});
+    print("REG = {X}\n", .{regs[instr.rd]});
+
     if (instr.func3 > 3) // si unsigned
     {
-        regs[instr.rd] = data;
+        regs[instr.rd] = data & mask;
     } else {
-        switch (instr.func3) {
-            0 => {
-                if (data >= 0x80) {
-                    regs[instr.rd] = data | ~mask;
-                }
-            },
-            1 => {
-                if (data >= 0x8000) {
-                    regs[instr.rd] = data | ~mask;
-                }
-            },
-            else => {
+        if (instr.func3 == 0) {
+            if (data >= 128) {
+                regs[instr.rd] = 0xffffff00 | data;
+            } else {
                 regs[instr.rd] = data;
-            },
+            }
+        } else if (instr.func3 == 1) {
+            if (data >= 0x8000) {
+                regs[instr.rd] = 0xffff0000 | data;
+            } else {
+                regs[instr.rd] = data;
+            }
+        } else {
+            regs[instr.rd] = data;
         }
     }
+    print("REG = {X}\n", .{regs[instr.rd]});
 }
 
 fn op_S(instr: S) void {
@@ -69,10 +78,11 @@ fn op_S(instr: S) void {
     const addr = regs[instr.rs1] +% instr.get_imm();
     for (0..mask) |i| {
         const idx: u5 = @truncate(i);
-        if (instr.rs2 == 0){
+        if (instr.rs2 == 0) {
             ram[addr + i] = 0;
+        } else { //little,  adress forte byte forte
+            ram[addr + mask - 1 - i] = @truncate(regs[instr.rs2] >> @as(u5, (mask - 1 - idx) * 8));
         }
-        ram[addr + i] = @truncate(regs[instr.rs2] >> @as(u5, (mask - 1 - idx) * 8));
     }
 }
 

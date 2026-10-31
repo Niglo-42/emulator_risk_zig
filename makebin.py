@@ -125,5 +125,174 @@ with open("bin.bin", "wb") as file:
         # lw x0, 0(x1)         (x0 doit rester à 0)
         b"\x03\xa0\x00\x00"
     )
+    # mem attendu pour LRSI
+    # 0x400: 80 7f 01 80     0x434: 80 7f 01 80
+    # 0x408: 80 7f 00 00     0x438: 00 00 80 7f
+    # 0x40c: 80 00 00 00     0x43c: 00 00 00 80
+    # 0x410: ff 00 ff ff     0x464: 80 7f 01 80
+    # 0x414: ff ff 00 00
+    
+    buf_test_b =  (
+        # addi x1, x0, 5
+        b"\x93\x00\x50\x00"
+        # addi x2, x0, 5
+        b"\x13\x01\x50\x00"
+        # addi x3, x0, 7
+        b"\x93\x01\x70\x00"
+        # addi x4, x0, -1
+        b"\x13\x02\xf0\xff"
+        # --- beq pris (x1 == x2) -> x5
+        # addi x5, x0, 1
+        b"\x93\x02\x10\x00"
+        # beq x1, x2, +8
+        b"\x63\x84\x20\x00"
+        # addi x5, x0, 0
+        b"\x93\x02\x00\x00"
+        # --- beq non pris (x1 != x3) -> x6
+        # addi x6, x0, 0
+        b"\x13\x03\x00\x00"
+        # beq x1, x3, +8
+        b"\x63\x84\x30\x00"
+        # addi x6, x0, 1
+        b"\x13\x03\x10\x00"
+        # --- bne pris -> x7
+        # addi x7, x0, 1
+        b"\x93\x03\x10\x00"
+        # bne x1, x3, +8
+        b"\x63\x94\x30\x00"
+        # addi x7, x0, 0
+        b"\x93\x03\x00\x00"
+        # --- bne non pris -> x8
+        # addi x8, x0, 0
+        b"\x13\x04\x00\x00"
+        # bne x1, x2, +8
+        b"\x63\x94\x20\x00"
+        # addi x8, x0, 1
+        b"\x13\x04\x10\x00"
+        # --- blt pris (5 < 7) -> x9
+        # addi x9, x0, 1
+        b"\x93\x04\x10\x00"
+        # blt x1, x3, +8
+        b"\x63\xc4\x30\x00"
+        # addi x9, x0, 0
+        b"\x93\x04\x00\x00"
+        # --- blt non pris (7 < 5 faux) -> x10
+        # addi x10, x0, 0
+        b"\x13\x05\x00\x00"
+        # blt x3, x1, +8
+        b"\x63\xc4\x11\x00"
+        # addi x10, x0, 1
+        b"\x13\x05\x10\x00"
+        # --- blt pris en signé (-1 < 5) -> x11
+        # addi x11, x0, 1
+        b"\x93\x05\x10\x00"
+        # blt x4, x1, +8
+        b"\x63\x44\x12\x00"
+        # addi x11, x0, 0
+        b"\x93\x05\x00\x00"
+
+        # --- bge pris (7 >= 5) -> x12
+        # addi x12, x0, 1
+        b"\x13\x06\x10\x00"
+        # bge x3, x1, +8
+        b"\x63\xd4\x11\x00"
+        # addi x12, x0, 0
+        b"\x13\x06\x00\x00"
+        # --- bge pris sur égalité -> x13
+        # addi x13, x0, 1
+        b"\x93\x06\x10\x00"
+        # bge x1, x2, +8
+        b"\x63\xd4\x20\x00"
+        # addi x13, x0, 0
+        b"\x93\x06\x00\x00"
+        # --- bge non pris en signé (-1 >= 5 faux) -> x14
+        # addi x14, x0, 0
+        b"\x13\x07\x00\x00"
+        # bge x4, x1, +8
+        b"\x63\x54\x12\x00"
+        # addi x14, x0, 1
+        b"\x13\x07\x10\x00"
+        # --- bltu pris (5 < 7) -> x15
+        # addi x15, x0, 1
+        b"\x93\x07\x10\x00"
+        # bltu x1, x3, +8
+        b"\x63\xe4\x30\x00"
+        # addi x15, x0, 0
+        b"\x93\x07\x00\x00"
+        # --- bltu non pris (0xFFFFFFFF < 5 faux) -> x16
+        # addi x16, x0, 0
+        b"\x13\x08\x00\x00"
+        # bltu x4, x1, +8
+        b"\x63\x64\x12\x00"
+        # addi x16, x0, 1
+        b"\x13\x08\x10\x00"
+        # --- bltu pris (5 < 0xFFFFFFFF) -> x17
+        # addi x17, x0, 1
+        b"\x93\x08\x10\x00"
+        # bltu x1, x4, +8
+        b"\x63\xe4\x40\x00"
+        # addi x17, x0, 0
+        b"\x93\x08\x00\x00"
+        # --- bgeu pris (0xFFFFFFFF >= 5) -> x18
+        # addi x18, x0, 1
+        b"\x13\x09\x10\x00"
+
+
+        # bgeu x4, x1, +8
+        b"\x63\x74\x12\x00"
+        # addi x18, x0, 0
+        b"\x13\x09\x00\x00"
+        # --- bgeu pris sur égalité -> x19
+        # addi x19, x0, 1
+        b"\x93\x09\x10\x00"
+        # bgeu x1, x2, +8
+        b"\x63\xf4\x20\x00"
+        # addi x19, x0, 0
+        b"\x93\x09\x00\x00"
+        # --- bgeu non pris (5 >= 7 faux) -> x20
+        # addi x20, x0, 0
+        b"\x13\x0a\x00\x00"
+        # bgeu x1, x3, +8
+        b"\x63\xf4\x30\x00"
+        # addi x20, x0, 1
+        b"\x13\x0a\x10\x00"
+        # --- boucle en arrière (offset négatif) : x22 compte 3 tours, x21 finit à 0
+        # addi x21, x0, 3
+        b"\x93\x0a\x30\x00"
+        # addi x22, x22, 1
+        b"\x13\x0b\x1b\x00"
+        # addi x21, x21, -1
+        b"\x93\x8a\xfa\xff"
+        # bne x21, x0, -8
+        b"\xe3\x9c\x0a\xfe"
+        # --- saut en avant de +84 -> x23
+        # addi x23, x0, 1
+
+
+        b"\x93\x0b\x10\x00"
+        # beq x0, x0, +84
+        b"\x63\x0a\x00\x04"
+        # 20 x addi x23, x0, 0 (jamais exécutés)
+        b"\x93\x0b\x00\x00" # normalement * 20
+        # --- saut en avant de +2048 (bit imm[11] à 1) -> x24
+        # addi x24, x0, 1
+        b"\x13\x0c\x10\x00"
+        # beq x0, x0, +2048
+        b"\xe3\x00\x00\x00"
+        # 511 x addi x24, x0, 0 (jamais exécutés)
+        b"\x13\x0c\x00\x00" # normalement * 511
+        # marqueur de fin atteinte
+        # addi x25, x0, 1
+        b"\x93\x0c\x10\x00"
+    )
+    # meme attendu pour B 
+    # R0:  0x00000000
+    # R1:  0x00000005    R2:  0x00000005
+    # R3:  0x00000007    R4:  0xffffffff
+    # R5 à R20: 0x00000001  (les 16 tests)
+    # R21: 0x00000000    R22: 0x00000003
+    # R23: 0x00000001    R24: 0x00000001
+    # R25: 0x00000001
+    # R26 à R31: 0
 
     file.write(buf)
