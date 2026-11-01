@@ -68,11 +68,13 @@ fn jal(instr: J) void {
 }
 
 fn jalr(instr: I) void {
+    var tmp: u32 = 0;
     if (instr.rd != 0) {
-        regs[instr.rd] = pc + 4;
+        tmp = pc + 4;
     }
     pc = regs[instr.rs1] +% instr.get_imm();
     pc = pc & 0xfffffffe;
+    regs[instr.rd] = tmp;
 }
 
 fn lui(instr: U) void {
@@ -178,7 +180,9 @@ pub fn srl(a: u32, b: u32) u32 {
 }
 
 pub fn slt(a: u32, b: u32) u32 {
-    if (a < b) {
+    const ai: i32 = @bitCast(a);
+    const bi: i32 = @bitCast(b);
+    if (ai < bi) {
         return 1;
     }
     return 0;
