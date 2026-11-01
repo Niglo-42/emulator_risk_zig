@@ -60,6 +60,29 @@ fn op_load(instr: I) void {
     }
 }
 
+fn jal(instr: J) void {
+    if (instr.rd != 0) {
+        regs[instr.rd] = pc + 4;
+    }
+    pc = pc +% instr.get_imm();
+}
+
+fn jalr(instr: I) void {
+    if (instr.rd != 0) {
+        regs[instr.rd] = pc + 4;
+    }
+    pc = regs[instr.rs1] +% instr.get_imm();
+    pc = pc & 0xfffffffe;
+}
+
+fn lui(instr: U) void {
+    regs[instr.rd] = instr.get_imm();
+}
+
+fn auipc(instr: U) void {
+    regs[instr.rd] = pc +% instr.get_imm();
+}
+
 fn op_S(instr: S) void {
     const mask: u5 = switch (instr.func3) {
         0 => 1,
@@ -235,6 +258,10 @@ fn disassembly(command: INSTRUCTION) void {
             7 => "bgeu",
             else => "invalid branch",
         },
+        0x67 => "jalr",
+        0x6f => "jal",
+        0x37 => "lui",
+        0x17 => "auipc",
         else => "invalid type",
     };
 
@@ -247,7 +274,7 @@ fn disassembly(command: INSTRUCTION) void {
         print("{s} x{d}, {d}(x{d}) \n", .{ tag, command.S.rs1, @as(i32, @bitCast(command.S.get_imm())), command.S.rs2 });
     } else if (command.R.opcode == 0x63) {
         print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.B.rs1, command.B.rs2, @as(i32, @bitCast(command.B.get_imm())) });
-    } else if (command.R.opcode == 0x64 or command.R.opcode == 0x6f) {
+    } else if (command.R.opcode == 0x67 or command.R.opcode == 0x6f) {
         print("{s} r{d}, #{d} \n", .{ tag, command.J.rd, @as(i32, @bitCast(command.J.get_imm())) });
     } else if (command.R.opcode == 0x37 or command.R.opcode == 0x17) {
         print("{s} r{d}, #{d} \n", .{ tag, command.U.rd, @as(i32, @bitCast(command.U.get_imm())) });
@@ -481,13 +508,19 @@ fn decode(instr: []const u8) void {
         0x23 => {
             op_S(instruction.S);
         },
-        0x37, 0x17 => {
-            //U
-            print("NOP", .{});
+        0x37 => {
+            lui(instruction.U);
         },
-        0x6f, 0x64 => {
-            //J
-            print("NOP", .{});
+        0x17 => {
+            auipc(instruction.U);
+        },
+        0x6f => {
+            flag = true;
+            jal(instruction.J);
+        },
+        0x67 => {
+            flag = true;
+            jalr(instruction.I);
         },
         else => {
             print("OPCODE UNKNOWN \n", .{});

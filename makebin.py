@@ -151,4 +151,43 @@ with open("bin.bin", "wb") as file:
         b"\x03\xa2\x00\x00"
     )
 
-    file.write(buf_test_b)
+    test_ju = (
+        # 0x00: jal x0, +12            (saute la fonction ; rien ne doit être écrit dans x0)
+b"\x6f\x00\xc0\x00"
+# 0x04: addi x13, x0, 1        (corps de la fonction)
+b"\x93\x06\x10\x00"
+# 0x08: jalr x0, 0(x12)        (retour)
+b"\x67\x00\x06\x00"
+# 0x0c: lui x1, 0x12345
+b"\xb7\x50\x34\x12"
+# 0x10: lui x2, 0xfffff
+b"\x37\xf1\xff\xff"
+# 0x14: auipc x3, 0x1
+b"\x97\x11\x00\x00"
+# 0x18: auipc x4, 0xfffff
+b"\x17\xf2\xff\xff"
+# 0x1c: jal x5, +12            (saut en avant vers 0x28)
+b"\xef\x02\xc0\x00"
+# 0x20: addi x10, x0, 1        (jamais exécuté)
+b"\x13\x05\x10\x00"
+# 0x24: addi x10, x0, 1        (jamais exécuté)
+b"\x13\x05\x10\x00"
+# 0x28: addi x6, x0, 1
+b"\x13\x03\x10\x00"
+# 0x2c: auipc x7, 0
+b"\x97\x03\x00\x00"
+# 0x30: jalr x8, 13(x7)        (cible impaire : 0x39, le bit 0 doit être effacé, arrivée en 0x38)
+b"\x67\x84\xd3\x00"
+# 0x34: addi x11, x0, 1        (jamais exécuté)
+b"\x93\x05\x10\x00"
+# 0x38: addi x9, x0, 1
+b"\x93\x04\x10\x00"
+# 0x3c: jal x12, -56           (appel de la fonction en 0x04, saut en arrière)
+b"\x6f\xf6\x9f\xfc"
+# 0x40: addi x14, x0, 1        (atteint après le retour)
+b"\x13\x07\x10\x00"
+# 0x44: addi x15, x0, 1        (marqueur de fin)
+b"\x93\x07\x10\x00"
+    )
+
+    file.write(test_ju)
