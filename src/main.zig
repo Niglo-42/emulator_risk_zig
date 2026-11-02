@@ -2,8 +2,9 @@ const std = @import("std");
 const print = std.debug.print;
 
 var regs: [32]u32 = @splat(0);
-var ram: [0x1000]u8 = @splat(0);
+var ram: [0x80000]u8 = @splat(0);
 var pc: u32 = 0;
+const _start_ = 0x1000;
 
 fn print_regs() void {
     for (regs, 0..regs.len) |reg, i| {
@@ -21,41 +22,38 @@ fn op_I(instr: I, f: fn (u32, u32) u32) void {
     regs[instr.rd] = f(regs[instr.rs1], instr.get_imm());
 }
 
-fn fetch_ram(addr: u32) u32 {
-    const word: []u8 = ram[addr .. addr + 4];
-    return std.mem.readInt(u32, word[0..4], std.builtin.Endian.little);
-}
-
 fn op_load(instr: I) void {
     if (instr.rd == 0) {
         return;
     }
     const mask: u32 = switch (instr.func3) {
-        0, 4 => 0xff,
-        1, 5 => 0xffff,
-        2 => 0xffffffff,
-        else => 0xffffffff,
+        0 => 0xffffff00, //lb
+        1 => 0xffff0000, //lh
+        else => 0x0,
     };
-    const data = fetch_ram(regs[instr.rs1] +% instr.get_imm()) & mask;
-
+    const size: u32 = switch (instr.func3) {
+        0, 4 => 1,
+        1, 5 => 2,
+        2 => 4,
+        else => 4,
+    };
+    const addr = regs[instr.rs1] +% instr.get_imm();
+    if (addr > ram.len or size > ram.len - addr) {
+        print("LOAD OUT OF BOUNDS: 0x{x}\n", .{addr});
+        return;
+    }
+    var data: u32 = 0;
+    for (0..size) |i| {
+        const shift: u5 = @truncate(i * 8);
+        data |= @as(u32, ram[addr + i]) << shift;
+    }
+    const neg: u5 = @truncate(size * 8 - 1);
     if (instr.func3 > 1) // si unsigned
     {
         regs[instr.rd] = data;
     } else {
-        if (instr.func3 == 0) {
-            if (data >= 0x80) {
-                regs[instr.rd] = 0xffffff00 | data;
-            } else {
-                regs[instr.rd] = data;
-            }
-        } else if (instr.func3 == 1) {
-            if (data >= 0x8000) {
-                regs[instr.rd] = 0xffff0000 | data;
-            } else {
-                regs[instr.rd] = data;
-            }
-        } else {
-            regs[instr.rd] = data;
+        if ((data >> neg) == 1) {
+            regs[instr.rd] = mask | data;
         }
     }
 }
@@ -86,20 +84,24 @@ fn auipc(instr: U) void {
 }
 
 fn op_S(instr: S) void {
-    const mask: u5 = switch (instr.func3) {
-        0 => 1,
-        1 => 2,
-        2 => 4,
-        else => 4,
+    const size: u32 = switch (instr.func3) {
+        0 => 1, // SB
+        1 => 2, // SH
+        2 => 4, // SW
+        else => return,
     };
+
     const addr = regs[instr.rs1] +% instr.get_imm();
-    for (0..mask) |i| {
-        const idx: u5 = @truncate(i);
-        if (instr.rs2 == 0) {
-            ram[addr + i] = 0;
-        } else { //little,  adress forte byte forte
-            ram[addr + mask - 1 - i] = @truncate(regs[instr.rs2] >> @as(u5, (mask - 1 - idx) * 8));
-        }
+    const value = regs[instr.rs2];
+
+    if (addr > ram.len or size > ram.len - addr) {
+        print("STORE OUT OF BOUNDS: 0x{x}\n", .{addr});
+        return;
+    }
+
+    for (0..size) |i| {
+        const shift: u5 = @intCast(i * 8);
+        ram[addr + i] = @truncate(value >> shift);
     }
 }
 
@@ -266,6 +268,7 @@ fn disassembly(command: INSTRUCTION) void {
         0x6f => "jal",
         0x37 => "lui",
         0x17 => "auipc",
+        0x73 => "ecall",
         else => "invalid type",
     };
 
@@ -275,7 +278,7 @@ fn disassembly(command: INSTRUCTION) void {
     } else if (command.R.opcode == 0x13) {
         print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.I.rd, command.I.rs1, @as(i32, @bitCast(command.I.get_imm())) });
     } else if (command.R.opcode == 0x23) {
-        print("{s} x{d}, {d}(x{d}) \n", .{ tag, command.S.rs1, @as(i32, @bitCast(command.S.get_imm())), command.S.rs2 });
+        print("{s} x{d}, {d}(x{d}) \n", .{ tag, command.S.rs2, @as(i32, @bitCast(command.S.get_imm())), command.S.rs1 });
     } else if (command.R.opcode == 0x63) {
         print("{s} r{d}, r{d}, #{d} \n", .{ tag, command.B.rs1, command.B.rs2, @as(i32, @bitCast(command.B.get_imm())) });
     } else if (command.R.opcode == 0x67 or command.R.opcode == 0x6f) {
@@ -284,6 +287,8 @@ fn disassembly(command: INSTRUCTION) void {
         print("{s} r{d}, #{d} \n", .{ tag, command.U.rd, @as(i32, @bitCast(command.U.get_imm())) });
     } else if (command.R.opcode == 0x3) {
         print("{s} x{d}, {d}(x{d}) \n", .{ tag, command.I.rd, @as(i32, @bitCast(command.I.get_imm())), command.I.rs1 });
+    } else if (command.R.opcode == 0x73) {
+        print("{s}\n", .{tag});
     } else {
         print("unrecognized arg", .{});
     }
@@ -425,9 +430,12 @@ const J = packed struct(u32) {
     }
 };
 
-fn decode(instr: []const u8) void {
+fn decode(instr: []const u8, init: std.process.Init, debug: bool, running: *bool) void {
     const instruction: INSTRUCTION = @bitCast(std.mem.readInt(u32, instr[0..4], std.builtin.Endian.little));
-    disassembly(instruction);
+    if (debug) {
+        disassembly(instruction);
+    }
+
     var flag = false;
     switch (instruction.R.opcode) {
         0x33 => {
@@ -526,6 +534,62 @@ fn decode(instr: []const u8) void {
             flag = true;
             jalr(instruction.I);
         },
+        0x73 => {
+            // system
+            //ecall = 0x73 pure
+            if (instruction.I.func3 == 0) {
+                if (instruction.I.get_imm() == 0) {
+                    switch (regs[17]) {
+                        93 => { //si a7 = 93 => exit
+                            running.* = false;
+                            regs[10] = 0; //exit(0)
+                            return;
+                        },
+                        64 => { // write
+                            const fd = regs[10];
+                            if (fd < 1 and fd > 2) {
+                                regs[10] = 0xfffffff7; //EBADFD = -9
+                            }
+                            const addr: usize = @intCast(regs[11]);
+                            const len: usize = @intCast(regs[12]);
+                            if (addr > ram.len or len > ram.len - addr) {
+                                print("ECALL: invalid buffer address\n", .{});
+                                running.* = false;
+                                regs[10] = 0xfffffff2; //EFAULT = -14
+                            }
+                            const buf = ram[addr .. addr + len];
+                            const result = std.os.linux.write(
+                                @intCast(fd),
+                                buf.ptr,
+                                buf.len,
+                            );
+                            regs[10] = @truncate(result);
+                        },
+                        else => {
+                            print("eror {d} \n", .{regs[17]});
+                        },
+                    }
+                } else if (instruction.I.imm == 1) {
+                    //ebreak 0x00100073
+                    const stdin_fd: std.os.linux.fd_t = 0;
+                    var buffer: [1024]u8 = undefined;
+                    const len = std.os.linux.read(
+                        stdin_fd,
+                        &buffer,
+                        buffer.len,
+                    );
+                    _ = len;
+                }
+            }
+        },
+        0xf => {
+            //FENCE (opcode 0x0F, funct3 = 0)
+            //Ses champs sont fm (bits 31:28),
+            //pred (27:24) et succ (23:20).
+            // Chaque ensemble pred/succ compose quatre bits :
+            // I (entrée), O (sortie), R (lecture) et W (écriture),
+            //avec I = bit 3 et W = bit 0
+        },
         else => {
             print("OPCODE UNKNOWN \n", .{});
         },
@@ -533,15 +597,20 @@ fn decode(instr: []const u8) void {
     if (flag == false) {
         pc += 4;
     }
+    _ = init;
+    regs[0] = 0;
 }
 
-fn fetch_mem(buffer: []u8, instr_size: u8, buf_len: u64) void {
-    while (pc < buf_len) {
-        const end = @min(pc + instr_size, buf_len);
-        const instr = buffer[pc..end];
-        decode(instr);
+fn fetch_mem(instr_size: u8, buf_len: u64, init: std.process.Init, debug: bool) void {
+    var running: bool = true;
+    while (pc < buf_len + _start_ and running) {
+        const end = @min(pc + instr_size, buf_len + _start_);
+        const instr = ram[pc..end];
+        decode(instr, init, debug, &running);
     }
-    print_regs();
+    if (debug) {
+        print_regs();
+    }
 }
 
 pub fn main(init: std.process.Init) !void {
@@ -549,6 +618,10 @@ pub fn main(init: std.process.Init) !void {
     const args = try init.minimal.args.toSlice(arena);
     const opener = std.Io.Dir.cwd();
     const file = try opener.openFile(init.io, args[1], .{});
+    var debug = false;
+    if (args.len == 3) {
+        debug = true;
+    }
     defer file.close(init.io);
     const stat = try file.stat(init.io);
     const size: u64 = stat.size;
@@ -558,7 +631,13 @@ pub fn main(init: std.process.Init) !void {
     if (n != size) {
         print("hoho problemo", .{});
     }
-    fetch_mem(buffer, 4, size);
+    // Charger le programme en RAM
+    @memcpy(ram[_start_ .. _start_ + n], buffer[0..n]);
+    // Initialiser la stack
+    regs[2] = @intCast(ram.len);
+    // Init du PC
+    pc = _start_;
+    fetch_mem(4, size, init, debug);
     print_ram();
 }
 
