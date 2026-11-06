@@ -1,11 +1,11 @@
 const std = @import("std");
 const print = std.debug.print;
 const def_reg = @import("define_regs.zig");
+const elf = @import("elf.zig");
 
-
-var regs: [32]u32 = @splat(0);
-var ram: [0x80000]u8 = undefined;
-var pc: u32 = 0;
+pub var regs: [32]u32 = @splat(0);
+pub var ram: [0x80000]u8 = undefined;
+pub var pc: u32 = 0;
 const _start_ = 0x1000;
 
 fn print_regs() void {
@@ -635,6 +635,8 @@ pub fn main(init: std.process.Init) !void {
         print("hoho problemo", .{});
     }
     // Charger le programme en RAM
+    elf.parse_elf(buffer, &regs);
+    std.process.exit(1);
     @memcpy(ram[_start_ .. _start_ + n], buffer[0..n]);
     // Initialiser la stack
     regs[2] = @intCast(ram.len);
