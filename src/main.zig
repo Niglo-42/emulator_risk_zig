@@ -1,8 +1,10 @@
 const std = @import("std");
 const print = std.debug.print;
+const def_reg = @import("define_regs.zig");
+
 
 var regs: [32]u32 = @splat(0);
-var ram: [0x80000]u8 = @splat(0);
+var ram: [0x80000]u8 = undefined;
 var pc: u32 = 0;
 const _start_ = 0x1000;
 
@@ -614,6 +616,7 @@ fn fetch_mem(instr_size: u8, buf_len: u64, init: std.process.Init, debug: bool) 
 }
 
 pub fn main(init: std.process.Init) !void {
+    @memset(ram[0..], 0);
     const arena = init.arena.allocator();
     const args = try init.minimal.args.toSlice(arena);
     const opener = std.Io.Dir.cwd();

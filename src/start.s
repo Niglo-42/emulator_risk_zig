@@ -2,7 +2,7 @@
 .globl _start
 
 _start:
-    li sp, 0x80000
+    la sp, _stack_top
     call main
 
     # code 93 = exit
