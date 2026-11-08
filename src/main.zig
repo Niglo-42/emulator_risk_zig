@@ -56,6 +56,8 @@ fn op_load(instr: I) void {
     } else {
         if ((data >> neg) == 1) {
             regs[instr.rd] = mask | data;
+        } else {
+            regs[instr.rd] = data;
         }
     }
 }
@@ -68,13 +70,11 @@ fn jal(instr: J) void {
 }
 
 fn jalr(instr: I) void {
-    var tmp: u32 = 0;
+    const ra: u32 = pc + 4;
+    pc = (regs[instr.rs1] +% instr.get_imm()) & 0xfffffffe;
     if (instr.rd != 0) {
-        tmp = pc + 4;
+        regs[instr.rd] = ra;
     }
-    pc = regs[instr.rs1] +% instr.get_imm();
-    pc = pc & 0xfffffffe;
-    regs[instr.rd] = tmp;
 }
 
 fn lui(instr: U) void {
@@ -549,15 +549,13 @@ fn decode(instr: []const u8, init: std.process.Init, debug: bool, running: *bool
                         },
                         64 => { // write
                             const fd = regs[10];
-                            if (fd < 1 and fd > 2) {
-                                regs[10] = 0xfffffff7; //EBADFD = -9
-                            }
                             const addr: usize = @intCast(regs[11]);
                             const len: usize = @intCast(regs[12]);
                             if (addr > ram.len or len > ram.len - addr) {
                                 print("ECALL: invalid buffer address\n", .{});
                                 running.* = false;
                                 regs[10] = 0xfffffff2; //EFAULT = -14
+                                std.process.exit(1);
                             }
                             const buf = ram[addr .. addr + len];
                             const result = std.os.linux.write(
@@ -603,12 +601,10 @@ fn decode(instr: []const u8, init: std.process.Init, debug: bool, running: *bool
     regs[0] = 0;
 }
 
-fn fetch_mem(instr_size: u8, buf_len: u64, init: std.process.Init, debug: bool) void {
+fn fetch_mem(instr_size: u8, init: std.process.Init, debug: bool) void {
     var running: bool = true;
-    while (pc < buf_len + _start_ and running) {
-        const end = @min(pc + instr_size, buf_len + _start_);
-        const instr = ram[pc..end];
-        decode(instr, init, debug, &running);
+    while (running) {
+        decode(ram[pc .. pc + instr_size], init, debug, &running);
     }
     if (debug) {
         print_regs();
@@ -634,17 +630,20 @@ pub fn main(init: std.process.Init) !void {
     if (n != size) {
         print("hoho problemo", .{});
     }
-    // Charger le programme en RAM
     elf.parse_elf(buffer, &regs);
-    std.process.exit(1);
-    @memcpy(ram[_start_ .. _start_ + n], buffer[0..n]);
-    // Initialiser la stack
-    regs[2] = @intCast(ram.len);
-    // Init du PC
-    pc = _start_;
-    fetch_mem(4, size, init, debug);
+    regs[def_reg.sp] = ram.len;
+    fetch_mem(4, init, debug);
     print_ram();
 }
+
+// fn dump_buffer(buffer: []u8, size: usize) void {
+//     for (0..size) |i| {
+//         if (i != 0 and i & 3 == 0) {
+//             print("\n", .{});
+//         }
+//         print("{X:0>2}", .{buffer[i]});
+//     }
+// }
 
 fn print_ram() void {
     for (0..32) |byte| {

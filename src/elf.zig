@@ -28,6 +28,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
     //     print("#{d:>2}: {x:>2}\n", .{ i, byte });
     // }
     const magic = [_]u8{ 0x7f, 0x45, 0x4c, 0x46 };
+
     for (buffer[0..4], magic) |byte, cmp| {
         if (byte != cmp) {
             print_err.error_handeling(
@@ -50,12 +51,13 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
     }
     if (bytes_reader(buffer[18..20]) != 0xf3) { // if risk_v 243[base10]
         print_err.error_handeling(
-            @as(u32, buffer[7]),
+            bytes_reader(buffer[18..20]),
             @as(u32, 243),
             regs,
             "wrong_machine",
         );
     }
+
     if (bytes_reader(buffer[20..24]) != 1) { // if risk_v I !
         print_err.error_handeling(
             bytes_reader(buffer[20..24]),
@@ -131,17 +133,12 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
             "wrong_phnum",
         );
     }
-
-    for (0..e_phnum - 1) |i| {
-        const p_h = prog_header.init(buffer[e_phoff + i * e_phentsize..][0..32]);
-        if (p_h.p_type == 2 or p_h.p_type == 3) {
-            print_err.error_handeling(
-                p_h.p_type,
-                1,
-                regs,
-                "wrong_p_type dynamic linking not supported",
-            );
+    for (0..e_phnum) |i| {
+        const p_h = prog_header.init(buffer[e_phoff + i * e_phentsize ..][0..32]);
+        if (p_h.p_type != 1) {
+            continue;
         }
+
         if (p_h.p_memsz == 0) {
             continue;
         }
@@ -166,13 +163,12 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
         @memset(main.ram[dest + p_h.p_filesz .. dest + p_h.p_memsz], 0);
         // todo verif si entry est dedans
     }
-
     if (regs[def_reg.a0] == 1) {
         std.process.exit(1);
     }
 }
 
-const prog_header = packed struct {
+const prog_header = struct {
     p_type: u32,
     p_offset: u32,
     p_vaddr: u32,

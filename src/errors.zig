@@ -9,5 +9,5 @@ pub fn error_handeling(
     error_type: []const u8,
 ) void {
     regs[def_reg.a0] = 1;
-    print("error {s}: {d}, expected: {d}", .{ error_type, bad_value, expected_val });
+    print("error {s}: {d}, expected: {d}\n", .{ error_type, bad_value, expected_val });
 }
