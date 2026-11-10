@@ -558,14 +558,6 @@ fn decode(instr: []const u8, init: std.process.Init, debug: bool) void {
                     );
                 } else if (instruction.I.imm == 1) {
                     //ebreak 0x00100073
-                    const stdin_fd: std.os.linux.fd_t = 0;
-                    var buffer: [1024]u8 = undefined;
-                    const len = std.os.linux.read(
-                        stdin_fd,
-                        &buffer,
-                        buffer.len,
-                    );
-                    _ = len;
                 }
             }
         },
