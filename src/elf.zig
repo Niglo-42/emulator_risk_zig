@@ -1,8 +1,8 @@
-const def_reg = @import("define_regs.zig");
-const print_err = @import("errors.zig");
+const def_reg = @import("data/define_regs.zig");
+const print_err = @import("data/errors.zig");
 const std = @import("std");
 const print = std.debug.print;
-const spec = @import("spec.zig");
+const spec = @import("data/spec.zig");
 const main = @import("main.zig");
 
 pub fn bytes_reader(buffer: []u8) u32 {

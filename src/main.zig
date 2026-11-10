@@ -1,7 +1,8 @@
 const std = @import("std");
 const print = std.debug.print;
-const def_reg = @import("define_regs.zig");
+const def_reg = @import("data/define_regs.zig");
 const elf = @import("elf.zig");
+const sys = @import("syscall.zig");
 
 pub var regs: [32]u32 = @splat(0);
 pub var ram: [0x80000]u8 = undefined;
@@ -432,7 +433,7 @@ const J = packed struct(u32) {
     }
 };
 
-fn decode(instr: []const u8, init: std.process.Init, debug: bool, running: *bool) void {
+fn decode(instr: []const u8, init: std.process.Init, debug: bool) void {
     const instruction: INSTRUCTION = @bitCast(std.mem.readInt(u32, instr[0..4], std.builtin.Endian.little));
     if (debug) {
         disassembly(instruction);
@@ -541,34 +542,20 @@ fn decode(instr: []const u8, init: std.process.Init, debug: bool, running: *bool
             //ecall = 0x73 pure
             if (instruction.I.func3 == 0) {
                 if (instruction.I.get_imm() == 0) {
-                    switch (regs[17]) {
-                        93 => { //si a7 = 93 => exit
-                            running.* = false;
-                            regs[10] = 0; //exit(0)
-                            return;
-                        },
-                        64 => { // write
-                            const fd = regs[10];
-                            const addr: usize = @intCast(regs[11]);
-                            const len: usize = @intCast(regs[12]);
-                            if (addr > ram.len or len > ram.len - addr) {
-                                print("ECALL: invalid buffer address\n", .{});
-                                running.* = false;
-                                regs[10] = 0xfffffff2; //EFAULT = -14
-                                std.process.exit(1);
-                            }
-                            const buf = ram[addr .. addr + len];
-                            const result = std.os.linux.write(
-                                @intCast(fd),
-                                buf.ptr,
-                                buf.len,
-                            );
-                            regs[10] = @truncate(result);
-                        },
-                        else => {
-                            print("eror {d} \n", .{regs[17]});
-                        },
-                    }
+                    const ram_addr: u32 = @truncate(@intFromPtr(&ram));
+                    regs[def_reg.a7] = sys.translate(regs[def_reg.a7]) catch 1;
+                    const flags: u16 = @truncate(regs[def_reg.a7]);
+                    regs[def_reg.a7] = regs[def_reg.a7] & 0x3ff;
+                    sys.read_flags(flags, &regs, ram_addr);
+                    regs[def_reg.a0] = sys.syscall6(
+                        regs[def_reg.a7],
+                        regs[def_reg.a0],
+                        regs[def_reg.a1],
+                        regs[def_reg.a2],
+                        regs[def_reg.a3],
+                        regs[def_reg.a4],
+                        regs[def_reg.a5],
+                    );
                 } else if (instruction.I.imm == 1) {
                     //ebreak 0x00100073
                     const stdin_fd: std.os.linux.fd_t = 0;
@@ -602,9 +589,8 @@ fn decode(instr: []const u8, init: std.process.Init, debug: bool, running: *bool
 }
 
 fn fetch_mem(instr_size: u8, init: std.process.Init, debug: bool) void {
-    var running: bool = true;
-    while (running) {
-        decode(ram[pc .. pc + instr_size], init, debug, &running);
+    while (true) {
+        decode(ram[pc .. pc + instr_size], init, debug);
     }
     if (debug) {
         print_regs();
