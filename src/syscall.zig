@@ -1,5 +1,6 @@
 const std = @import("std");
 const print = std.debug.print;
+const bus = @import("bus.zig");
 
 pub fn syscall6(
     number: u32,
@@ -10,22 +11,6 @@ pub fn syscall6(
     arg5: anytype,
     arg6: anytype,
 ) u32 {
-    // print(
-    // \\
-    // \\    return asm volatile ("syscall"
-    // \\    : [ret] "={rax}" (-> u32),
-    // \\    : [number] "{rax}" (number),
-    // \\      [arg1] "{rdi}" (arg1),
-    // \\      [arg2] "{rsi}" (arg2),
-    // \\      [arg3] "{rdx}" (arg3),
-    // \\      [arg4] "{r10}" (arg4),
-    // \\      [arg5] "{r8}" (arg5),
-    // \\      [arg6] "{r9}" (arg6),
-    // \\    : .{ .rcx = true, .r11 = true, .memory = true });
-    // \\
-    // , {d}, {d}, {d}\n
-    // )
-    // print("{d} {d} {d}\n", .{ arg1, arg2, arg3 });
     return asm volatile ("syscall"
         : [ret] "={rax}" (-> u32),
         : [number] "{rax}" (number),
@@ -56,10 +41,11 @@ pub fn translate(number: u32) !u32 {
 
 pub const SYSCALL_UNSUPPORTED: u16 = 0xFFFF;
 
-pub fn read_flags(flags: u16, regs: *[32]u32, ram_addr: u32) void {
+pub fn read_flags(flags: u16, regs: *[32]u32) void {
     if (flags == 0xffff) {
         return;
     }
+    const ram_addr: u32 = @truncate(@intFromPtr(&bus.perif.ram));
     for (10..16, 1..) |bit, i| {
         const shr: u4 = @truncate(bit);
         if ((flags >> shr) & 1 == 1) {

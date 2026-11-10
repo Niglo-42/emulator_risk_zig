@@ -3,9 +3,9 @@ const print = std.debug.print;
 const def_reg = @import("data/define_regs.zig");
 const elf = @import("elf.zig");
 const sys = @import("syscall.zig");
+const bus = @import("bus.zig");
 
 pub var regs: [32]u32 = @splat(0);
-pub var ram: [0x80000]u8 = undefined;
 pub var pc: u32 = 0;
 const _start_ = 0x1000;
 
@@ -38,18 +38,10 @@ fn op_load(instr: I) void {
         0, 4 => 1,
         1, 5 => 2,
         2 => 4,
-        else => 4,
+        else => 0,
     };
     const addr = regs[instr.rs1] +% instr.get_imm();
-    if (addr > ram.len or size > ram.len - addr) {
-        print("LOAD OUT OF BOUNDS: 0x{x}\n", .{addr});
-        return;
-    }
-    var data: u32 = 0;
-    for (0..size) |i| {
-        const shift: u5 = @truncate(i * 8);
-        data |= @as(u32, ram[addr + i]) << shift;
-    }
+    const data: u32 = bus.fetch_mem(addr, size) catch 0;
     const neg: u5 = @truncate(size * 8 - 1);
     if (instr.func3 > 1) // si unsigned
     {
@@ -86,7 +78,7 @@ fn auipc(instr: U) void {
     regs[instr.rd] = pc +% instr.get_imm();
 }
 
-fn op_S(instr: S) void {
+fn op_S(instr: S) !void {
     const size: u32 = switch (instr.func3) {
         0 => 1, // SB
         1 => 2, // SH
@@ -96,16 +88,7 @@ fn op_S(instr: S) void {
 
     const addr = regs[instr.rs1] +% instr.get_imm();
     const value = regs[instr.rs2];
-
-    if (addr > ram.len or size > ram.len - addr) {
-        print("STORE OUT OF BOUNDS: 0x{x}\n", .{addr});
-        return;
-    }
-
-    for (0..size) |i| {
-        const shift: u5 = @intCast(i * 8);
-        ram[addr + i] = @truncate(value >> shift);
-    }
+    try bus.store_mem(addr, size, value);
 }
 
 fn op_B(instr: B) bool {
@@ -433,8 +416,8 @@ const J = packed struct(u32) {
     }
 };
 
-fn decode(instr: []const u8, init: std.process.Init, debug: bool) void {
-    const instruction: INSTRUCTION = @bitCast(std.mem.readInt(u32, instr[0..4], std.builtin.Endian.little));
+fn decode(instr: u32, init: std.process.Init, debug: bool) !void {
+    const instruction: INSTRUCTION = @bitCast(instr);
     if (debug) {
         disassembly(instruction);
     }
@@ -521,7 +504,7 @@ fn decode(instr: []const u8, init: std.process.Init, debug: bool) void {
             flag = op_B(instruction.B);
         },
         0x23 => {
-            op_S(instruction.S);
+            try op_S(instruction.S);
         },
         0x37 => {
             lui(instruction.U);
@@ -542,11 +525,10 @@ fn decode(instr: []const u8, init: std.process.Init, debug: bool) void {
             //ecall = 0x73 pure
             if (instruction.I.func3 == 0) {
                 if (instruction.I.get_imm() == 0) {
-                    const ram_addr: u32 = @truncate(@intFromPtr(&ram));
                     regs[def_reg.a7] = sys.translate(regs[def_reg.a7]) catch 1;
                     const flags: u16 = @truncate(regs[def_reg.a7]);
                     regs[def_reg.a7] = regs[def_reg.a7] & 0x3ff;
-                    sys.read_flags(flags, &regs, ram_addr);
+                    sys.read_flags(flags, &regs);
                     regs[def_reg.a0] = sys.syscall6(
                         regs[def_reg.a7],
                         regs[def_reg.a0],
@@ -580,9 +562,9 @@ fn decode(instr: []const u8, init: std.process.Init, debug: bool) void {
     regs[0] = 0;
 }
 
-fn fetch_mem(instr_size: u8, init: std.process.Init, debug: bool) void {
+fn fetch(instr_size: u8, init: std.process.Init, debug: bool) !void {
     while (true) {
-        decode(ram[pc .. pc + instr_size], init, debug);
+        try decode(try bus.fetch_mem(pc, instr_size), init, debug);
     }
     if (debug) {
         print_regs();
@@ -590,7 +572,6 @@ fn fetch_mem(instr_size: u8, init: std.process.Init, debug: bool) void {
 }
 
 pub fn main(init: std.process.Init) !void {
-    @memset(ram[0..], 0);
     const arena = init.arena.allocator();
     const args = try init.minimal.args.toSlice(arena);
     const opener = std.Io.Dir.cwd();
@@ -609,25 +590,5 @@ pub fn main(init: std.process.Init) !void {
         print("hoho problemo", .{});
     }
     elf.parse_elf(buffer, &regs);
-    regs[def_reg.sp] = ram.len;
-    fetch_mem(4, init, debug);
-    print_ram();
-}
-
-// fn dump_buffer(buffer: []u8, size: usize) void {
-//     for (0..size) |i| {
-//         if (i != 0 and i & 3 == 0) {
-//             print("\n", .{});
-//         }
-//         print("{X:0>2}", .{buffer[i]});
-//     }
-// }
-
-fn print_ram() void {
-    for (0..32) |byte| {
-        if (byte != 0 and byte & 3 == 0) {
-            print("\n", .{});
-        }
-        print("{X:0>2}", .{ram[0x400 + byte]});
-    }
+    try fetch(4, init, debug);
 }

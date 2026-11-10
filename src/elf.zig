@@ -4,6 +4,7 @@ const std = @import("std");
 const print = std.debug.print;
 const spec = @import("data/spec.zig");
 const main = @import("main.zig");
+const bus = @import("bus.zig");
 
 pub fn bytes_reader(buffer: []u8) u32 {
     var result: u32 = 0;
@@ -150,17 +151,18 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
                 "file image has to < memory image",
             );
         }
-        if (p_h.p_paddr + p_h.p_memsz > main.ram.len) {
+        if (p_h.p_paddr + p_h.p_memsz > bus.perif.ram.len) {
             print_err.error_handeling(
                 p_h.p_paddr + p_h.p_memsz,
-                main.ram.len - 1,
+                bus.perif.ram.len - 1,
                 regs,
                 "out of ram !",
             );
         }
         const dest = p_h.p_paddr - 0;
-        @memcpy(main.ram[dest .. dest + p_h.p_filesz], buffer[p_h.p_offset .. p_h.p_offset + p_h.p_filesz]);
-        @memset(main.ram[dest + p_h.p_filesz .. dest + p_h.p_memsz], 0);
+        print("{d}\n", .{p_h.p_paddr});
+        @memcpy(bus.perif.ram[dest .. dest + p_h.p_filesz], buffer[p_h.p_offset .. p_h.p_offset + p_h.p_filesz]);
+        @memset(bus.perif.ram[dest + p_h.p_filesz .. dest + p_h.p_memsz], 0);
         // todo verif si entry est dedans
     }
     if (regs[def_reg.a0] == 1) {
