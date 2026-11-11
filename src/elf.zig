@@ -1,8 +1,4 @@
-const def_reg = @import("data/define_regs.zig");
 const print_err = @import("data/errors.zig");
-const std = @import("std");
-const print = std.debug.print;
-const spec = @import("data/spec.zig");
 const fetch = @import("fetch_and_decode.zig");
 const bus = @import("bus.zig");
 
@@ -16,9 +12,9 @@ pub fn bytes_reader(buffer: []u8) u32 {
     return result;
 }
 
-pub fn parse_elf(buffer: []u8) void {
+pub fn parse_elf(buffer: []u8) !void {
     if (buffer.len < 52) {
-        print_err.error_handeling(
+        try print_err.error_handeling(
             @truncate(buffer.len),
             52,
             "header_too_short",
@@ -31,7 +27,7 @@ pub fn parse_elf(buffer: []u8) void {
 
     for (buffer[0..4], magic) |byte, cmp| {
         if (byte != cmp) {
-            print_err.error_handeling(
+            try print_err.error_handeling(
                 @as(u32, byte),
                 @as(u32, cmp),
 
@@ -41,7 +37,7 @@ pub fn parse_elf(buffer: []u8) void {
     }
     for (buffer[4..7]) |byte| {
         if (byte != 1) {
-            print_err.error_handeling(
+            try print_err.error_handeling(
                 @as(u32, byte),
                 @as(u32, 1),
 
@@ -50,7 +46,7 @@ pub fn parse_elf(buffer: []u8) void {
         }
     }
     if (bytes_reader(buffer[18..20]) != 0xf3) { // if risk_v 243[base10]
-        print_err.error_handeling(
+        try print_err.error_handeling(
             bytes_reader(buffer[18..20]),
             @as(u32, 243),
 
@@ -59,7 +55,7 @@ pub fn parse_elf(buffer: []u8) void {
     }
 
     if (bytes_reader(buffer[20..24]) != 1) { // if risk_v I !
-        print_err.error_handeling(
+        try print_err.error_handeling(
             bytes_reader(buffer[20..24]),
             1,
 
@@ -68,7 +64,7 @@ pub fn parse_elf(buffer: []u8) void {
     }
     const entry = bytes_reader(buffer[24..28]);
     if (entry >= bus.perif.ram.len + bus.RAM_BASE) {
-        print_err.error_handeling(
+        try print_err.error_handeling(
             entry,
             0x80000000,
 
@@ -91,7 +87,7 @@ pub fn parse_elf(buffer: []u8) void {
     // const e_shstrndx = bytes_reader(buffer[50..52]);
 
     if (e_phoff != 52) {
-        print_err.error_handeling(
+        try print_err.error_handeling(
             e_phoff,
             52,
 
@@ -100,7 +96,7 @@ pub fn parse_elf(buffer: []u8) void {
     }
 
     if (e_flags != 0) {
-        print_err.error_handeling(
+        try print_err.error_handeling(
             e_flags,
             0,
 
@@ -109,7 +105,7 @@ pub fn parse_elf(buffer: []u8) void {
     }
 
     if (e_phentsize != 32) {
-        print_err.error_handeling(
+        try print_err.error_handeling(
             e_phentsize,
             32,
 
@@ -118,7 +114,7 @@ pub fn parse_elf(buffer: []u8) void {
     }
 
     if (e_ehsize != 52) {
-        print_err.error_handeling(
+        try print_err.error_handeling(
             e_ehsize,
             52,
 
@@ -126,7 +122,7 @@ pub fn parse_elf(buffer: []u8) void {
         );
     }
     if (e_phnum == 0) {
-        print_err.error_handeling(
+        try print_err.error_handeling(
             e_phnum,
             1,
 
@@ -143,7 +139,7 @@ pub fn parse_elf(buffer: []u8) void {
             continue;
         }
         if (p_h.p_filesz > p_h.p_memsz) {
-            print_err.error_handeling(
+            try print_err.error_handeling(
                 p_h.p_filesz,
                 1,
 
@@ -151,10 +147,17 @@ pub fn parse_elf(buffer: []u8) void {
             );
         }
         if (p_h.p_paddr + p_h.p_memsz > bus.perif.ram.len + bus.RAM_BASE) {
-            print_err.error_handeling(
+            try print_err.error_handeling(
                 p_h.p_paddr + p_h.p_memsz,
                 bus.perif.ram.len - 1 + bus.RAM_BASE,
 
+                "out of ram !",
+            );
+        }
+        if (p_h.p_paddr < bus.RAM_BASE) {
+                try print_err.error_handeling(
+                p_h.p_paddr,
+                bus.RAM_BASE,
                 "out of ram !",
             );
         }

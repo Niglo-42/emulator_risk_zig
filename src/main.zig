@@ -1,11 +1,14 @@
 const std = @import("std");
 const elf = @import("elf.zig");
 const launch = @import("fetch_and_decode.zig");
-
+const Err = error{BinPathIsMissing};
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
     const args = try init.minimal.args.toSlice(arena);
     const opener = std.Io.Dir.cwd();
+    if (args.len < 2) {
+        return Err.BinPathIsMissing;
+    }
     const file = try opener.openFile(init.io, args[1], .{});
     var debug = false;
     if (args.len == 3) {
@@ -17,6 +20,6 @@ pub fn main(init: std.process.Init) !void {
     const buffer = try arena.alloc(u8, size);
     defer arena.free(buffer);
     _ = try file.readPositionalAll(init.io, buffer, 0);
-    elf.parse_elf(buffer);
+    try elf.parse_elf(buffer);
     try launch.fetch(4, debug);
 }

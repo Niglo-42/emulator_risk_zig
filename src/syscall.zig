@@ -50,7 +50,6 @@ fn translate(number: u32) !struct{u6, u64} {
     if (number >= RISCV_TO_X64.len)
         return Err.SYSCALL_UNSUPPORTED;
     const host_number = RISCV_TO_X64[number];
-    // const flags: u6 = ;
     return .{@truncate(host_number >> 10), @as(u64, host_number & 0x3ff)};
 }
 
@@ -62,7 +61,8 @@ pub fn read_flags(flags: u6, regs_cpy: *[6]u64) !void {
         const shr: u3 = @truncate(bit);
         if ((flags >> shr) & 1 == 1) {
             const offset, const mem = try bus.get_addr(bus.regs[16 - i], 4);
-            const addr: u32 = @truncate(@intFromPtr(mem.ptr));
+            //attention impossible de savoir si le ptr est u32 ou u64...
+            const addr: u64 = @intFromPtr(mem.ptr);
             // print("{X:>8}, {*}, {X:>8}, {*}\n", .{offset, mem, addr, &bus.perif.ram});
             // std.process.exit(1);
             regs_cpy[6 - i] = offset + addr;
