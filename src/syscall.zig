@@ -41,17 +41,20 @@ pub fn translate(number: u32) !u32 {
 
 pub const SYSCALL_UNSUPPORTED: u16 = 0xFFFF;
 
-pub fn read_flags(flags: u16, regs: *[32]u32) void {
+pub fn read_flags(flags: u16, regs: *[32]u32) !void {
     if (flags == 0xffff) {
         return;
     }
-    const ram_addr: u32 = @truncate(@intFromPtr(&bus.perif.ram));
+
     for (10..16, 1..) |bit, i| {
         const shr: u4 = @truncate(bit);
         if ((flags >> shr) & 1 == 1) {
-            regs[16 - i] += ram_addr;
-        } // 0x4001
-        // 0b0100_00.00_0000_0000
+            const offset, const mem = try bus.get_addr(regs[16 - i], 4);
+            const addr: u32 = @truncate(@intFromPtr(mem.ptr));
+            // print("{X:>8}, {*}, {X:>8}, {*}\n", .{offset, mem, addr, &bus.perif.ram});
+            // std.process.exit(1);
+            regs[16 - i] = offset + addr;
+        }
     }
 }
 

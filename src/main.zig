@@ -528,7 +528,8 @@ fn decode(instr: u32, init: std.process.Init, debug: bool) !void {
                     regs[def_reg.a7] = sys.translate(regs[def_reg.a7]) catch 1;
                     const flags: u16 = @truncate(regs[def_reg.a7]);
                     regs[def_reg.a7] = regs[def_reg.a7] & 0x3ff;
-                    sys.read_flags(flags, &regs);
+                    
+                    try sys.read_flags(flags, &regs);
                     regs[def_reg.a0] = sys.syscall6(
                         regs[def_reg.a7],
                         regs[def_reg.a0],

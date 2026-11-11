@@ -68,10 +68,10 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
         );
     }
     const entry = bytes_reader(buffer[24..28]);
-    if (entry >= spec.ram_size) {
+    if (entry >= bus.perif.ram.len + bus.RAM_BASE) {
         print_err.error_handeling(
             entry,
-            0x1000,
+            0x80000000,
             regs,
             "entry out of bound",
         );
@@ -151,16 +151,15 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
                 "file image has to < memory image",
             );
         }
-        if (p_h.p_paddr + p_h.p_memsz > bus.perif.ram.len) {
+        if (p_h.p_paddr + p_h.p_memsz > bus.perif.ram.len + bus.RAM_BASE) {
             print_err.error_handeling(
                 p_h.p_paddr + p_h.p_memsz,
-                bus.perif.ram.len - 1,
+                bus.perif.ram.len - 1 + bus.RAM_BASE,
                 regs,
                 "out of ram !",
             );
         }
-        const dest = p_h.p_paddr - 0;
-        print("{d}\n", .{p_h.p_paddr});
+        const dest = p_h.p_paddr - bus.RAM_BASE;
         @memcpy(bus.perif.ram[dest .. dest + p_h.p_filesz], buffer[p_h.p_offset .. p_h.p_offset + p_h.p_filesz]);
         @memset(bus.perif.ram[dest + p_h.p_filesz .. dest + p_h.p_memsz], 0);
         // todo verif si entry est dedans

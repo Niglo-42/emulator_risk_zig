@@ -4,7 +4,7 @@ SECTIONS
 {
     . = 0x80000000;
 
-    _stack_top = 0x80000;
+    _stack_top = 0x80080000;
 
     .text : {
         *(.text.start)
