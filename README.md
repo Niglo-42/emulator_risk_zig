@@ -51,3 +51,7 @@ Adresse	Périphérique
 0x10000000	UART
 0x10010000	DISPLAY
 Autre	Bus fault
+
+TU EN ES LA :
+
+L’ecall écrase les registres du programme invité. bus.syscall() remplace a7 par le numéro hôte et les registres pointeurs par des adresses hôte, sans jamais les restaurer. Test : après un write, a1 et a7 ont changé. Ton s.c ne le voit pas car il recharge tout avant chaque ecall en -O0. Un ecall ne doit modifier que a0 : la traduction doit se faire sur des copies.

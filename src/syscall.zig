@@ -3,26 +3,32 @@ const print = std.debug.print;
 const bus = @import("bus.zig");
 const def_reg = @import("data/define_regs.zig");
 
-pub fn syscall() void {
+pub fn syscall() !void {
+    const flags: u6, const eax: u64 = try translate(bus.regs[def_reg.a7]);
+    if (flags == 0x3f and eax & 0x3ff == 0x3ff) {
+        return Err.SYSCALL_UNSUPPORTED;
+    }
+    var regs: [6]u64 = undefined;
+    try read_flags(flags, &regs);
     bus.regs[def_reg.a0] = syscall6(
-        bus.regs[def_reg.a7],
-        bus.regs[def_reg.a0],
-        bus.regs[def_reg.a1],
-        bus.regs[def_reg.a2],
-        bus.regs[def_reg.a3],
-        bus.regs[def_reg.a4],
-        bus.regs[def_reg.a5],
+        eax,
+        regs[0],
+        regs[1],
+        regs[2],
+        regs[3],
+        regs[4],
+        regs[5],
     );
 }
 
 pub fn syscall6(
-    number: u32,
-    arg1: anytype,
-    arg2: anytype,
-    arg3: anytype,
-    arg4: anytype,
-    arg5: anytype,
-    arg6: anytype,
+    number: u64,
+    arg1: u64,
+    arg2: u64,
+    arg3: u64,
+    arg4: u64,
+    arg5: u64,
+    arg6: u64,
 ) u32 {
     return asm volatile ("syscall"
         : [ret] "={rax}" (-> u32),
@@ -36,37 +42,32 @@ pub fn syscall6(
         : .{ .rcx = true, .r11 = true, .memory = true });
 }
 
-const Err = error {
+const Err = error{
     SYSCALL_UNSUPPORTED,
 };
 
-pub fn translate(number: u32) !u32 {
-    // if (number >= RISCV_TO_X64.len)
-    //     return Err.SYSCALL_UNSUPPORTED;
-
+fn translate(number: u32) !struct{u6, u64} {
+    if (number >= RISCV_TO_X64.len)
+        return Err.SYSCALL_UNSUPPORTED;
     const host_number = RISCV_TO_X64[number];
-
-    // if (host_number == SYSCALL_UNSUPPORTED)
-    //     return Err.SYSCALL_UNSUPPORTED;
-
-    return @as(u32, host_number);
+    // const flags: u6 = ;
+    return .{@truncate(host_number >> 10), @as(u64, host_number & 0x3ff)};
 }
 
 pub const SYSCALL_UNSUPPORTED: u16 = 0xFFFF;
 
-pub fn read_flags(flags: u16, regs: *[32]u32) !void {
-    if (flags == 0xffff) {
-        return;
-    }
+pub fn read_flags(flags: u6, regs_cpy: *[6]u64) !void {
 
-    for (10..16, 1..) |bit, i| {
-        const shr: u4 = @truncate(bit);
+    for (0..6, 1..) |bit, i| {
+        const shr: u3 = @truncate(bit);
         if ((flags >> shr) & 1 == 1) {
-            const offset, const mem = try bus.get_addr(regs[16 - i], 4);
+            const offset, const mem = try bus.get_addr(bus.regs[16 - i], 4);
             const addr: u32 = @truncate(@intFromPtr(mem.ptr));
             // print("{X:>8}, {*}, {X:>8}, {*}\n", .{offset, mem, addr, &bus.perif.ram});
             // std.process.exit(1);
-            regs[16 - i] = offset + addr;
+            regs_cpy[6 - i] = offset + addr;
+        } else {
+            regs_cpy[6 - i] = bus.regs[16 - i];
         }
     }
 }

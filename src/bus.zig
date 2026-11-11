@@ -39,13 +39,6 @@ pub var perif: Perif = .{
     // .pcie_mmio = @splat(0),
 };
 
-pub fn syscall() !void {
-    regs[def_reg.a7] = sys.translate(regs[def_reg.a7]) catch 1;
-    const flags: u16 = @truncate(regs[def_reg.a7]);
-    regs[def_reg.a7] = regs[def_reg.a7] & 0x3ff;
-    try sys.read_flags(flags, &regs);
-}
-
 pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8 } {
     switch (addr) {
         0x100...0xfff => {},

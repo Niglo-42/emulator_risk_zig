@@ -115,9 +115,8 @@ fn decode(instr: u32, debug: bool) !void {
             // system
             //ecall = 0x73 pure
             if (instruction.I.func3 == 0) {
-                try bus.syscall();
                 if (instruction.I.get_imm() == 0) {
-                    sys.syscall();
+                    try sys.syscall();
                 } else if (instruction.I.imm == 1) {
                     //ebreak 0x00100073
                 }
