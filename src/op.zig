@@ -2,6 +2,9 @@ const std = @import("std");
 const bus = @import("bus.zig");
 const fetch = @import("fetch_and_decode.zig");
 
+const Err = error{
+    BadByteNb,
+};
 
 pub fn _R(instr: R, f: fn (u32, u32) u32) void {
     bus.regs[instr.rd] = f(bus.regs[instr.rs1], bus.regs[instr.rs2]);
@@ -11,7 +14,7 @@ pub fn _I(instr: I, f: fn (u32, u32) u32) void {
     bus.regs[instr.rd] = f(bus.regs[instr.rs1], instr.get_imm());
 }
 
-pub fn _load(instr: I) void {
+pub fn _load(instr: I) !void {
     if (instr.rd == 0) {
         return;
     }
@@ -24,10 +27,10 @@ pub fn _load(instr: I) void {
         0, 4 => 1,
         1, 5 => 2,
         2 => 4,
-        else => 0,
+        else => {return Err.BadByteNb;},
     };
     const addr = bus.regs[instr.rs1] +% instr.get_imm();
-    const data: u32 = bus.fetch_mem(addr, size) catch 0;
+    const data: u32 = try bus.fetch_mem(addr, size);
     const neg: u5 = @truncate(size * 8 - 1);
     if (instr.func3 > 1) // si unsigned
     {
@@ -43,14 +46,14 @@ pub fn _load(instr: I) void {
 
 pub fn jal(instr: J) void {
     if (instr.rd != 0) {
-        bus.regs[instr.rd] = fetch.pc  + 4;
+        bus.regs[instr.rd] = fetch.pc + 4;
     }
-    fetch.pc  = fetch.pc  +% instr.get_imm();
+    fetch.pc = fetch.pc +% instr.get_imm();
 }
 
 pub fn jalr(instr: I) void {
-    const ra: u32 = fetch.pc  + 4;
-    fetch.pc  = (bus.regs[instr.rs1] +% instr.get_imm()) & 0xfffffffe;
+    const ra: u32 = fetch.pc + 4;
+    fetch.pc = (bus.regs[instr.rs1] +% instr.get_imm()) & 0xfffffffe;
     if (instr.rd != 0) {
         bus.regs[instr.rd] = ra;
     }
@@ -61,7 +64,7 @@ pub fn lui(instr: U) void {
 }
 
 pub fn auipc(instr: U) void {
-    bus.regs[instr.rd] = fetch.pc  +% instr.get_imm();
+    bus.regs[instr.rd] = fetch.pc +% instr.get_imm();
 }
 
 pub fn _S(instr: S) !void {
@@ -81,37 +84,37 @@ pub fn _B(instr: B) bool {
     switch (instr.func3) {
         0 => { // beq
             if (@as(i32, @bitCast(bus.regs[instr.rs1])) == @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                fetch.pc  = fetch.pc  +% instr.get_imm();
+                fetch.pc = fetch.pc +% instr.get_imm();
                 return true;
             }
         },
         1 => { // bne
             if (@as(i32, @bitCast(bus.regs[instr.rs1])) != @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                fetch.pc  = fetch.pc  +% instr.get_imm();
+                fetch.pc = fetch.pc +% instr.get_imm();
                 return true;
             }
         },
         4 => { //blt
             if (@as(i32, @bitCast(bus.regs[instr.rs1])) < @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                fetch.pc  = fetch.pc  +% instr.get_imm();
+                fetch.pc = fetch.pc +% instr.get_imm();
                 return true;
             }
         },
         5 => { //bge
             if (@as(i32, @bitCast(bus.regs[instr.rs1])) >= @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                fetch.pc  = fetch.pc  +% instr.get_imm();
+                fetch.pc = fetch.pc +% instr.get_imm();
                 return true;
             }
         },
         6 => { //bltu
             if (bus.regs[instr.rs1] < bus.regs[instr.rs2]) {
-                fetch.pc  = fetch.pc  +% instr.get_imm();
+                fetch.pc = fetch.pc +% instr.get_imm();
                 return true;
             }
         },
         7 => { //bgeu
             if (bus.regs[instr.rs1] >= bus.regs[instr.rs2]) {
-                fetch.pc  = fetch.pc  +% instr.get_imm();
+                fetch.pc = fetch.pc +% instr.get_imm();
                 return true;
             }
         },

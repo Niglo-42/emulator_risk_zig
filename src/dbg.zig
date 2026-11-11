@@ -4,11 +4,10 @@ const std = @import("std");
 const print = std.debug.print;
 const bus = @import("bus.zig");
 const fetch = @import("fetch_and_decode.zig");
-const regs = bus.regs;
 
 
 pub fn print_regs() void {
-    for (regs, 0..regs.len) |reg, i| {
+    for (bus.regs, 0..bus.regs.len) |reg, i| {
         print("R{d}: 0x{x:0>8}\n", .{ i, reg });
     }
     print("PC: 0x{x:0>8}\n", .{fetch.pc });
@@ -21,11 +20,11 @@ pub fn disassembly(command: INSTRUCTION) void {
         0x33 => switch (func7) {
             0x20 => switch (command.R.func3) {
                 0 => "sub",
-                4 => "sra",
+                5 => "sra",
                 else => "sub/sra_bug",
             },
             else => switch (command.R.func3) {
-                0 => "sub",
+                0 => "add",
                 1 => "sll",
                 2 => "slt",
                 3 => "sltu",

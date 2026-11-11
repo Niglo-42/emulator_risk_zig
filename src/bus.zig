@@ -3,7 +3,6 @@ const print = std.debug.print;
 const def_reg = @import("data/define_regs.zig");
 const sys = @import("syscall.zig");
 
-
 const Err = error{
     Byte_Size_Err,
     BadAdress,
@@ -13,31 +12,31 @@ pub var regs: [32]u32 = @splat(0);
 pub const RAM_BASE = 0x80000000;
 
 pub const Perif = struct {
-    debug: [0x100]u8,
+    debug: [0xf00]u8,
     ram: [0x100000]u8, // 1mo
-    virt_test: [0x1000]u8,
+    // virt_test: [0x1000]u8,
     time: [0x1000]u8,
     clint: [0x10000]u8,
-    Pio: [0x10000]u8,
-    virt_plic: [0x1000]u8,
-    uart: [0x100]u8,
-    mmio: [0x1000]u8,
-    pcie_ecam: [0x1000]u8,
-    pcie_mmio: [0x1000]u8,
+    // Pio: [0x10000]u8,
+    // virt_plic: [0x1000]u8,
+    uart: [0x1000]u8,
+    // mmio: [0x1000]u8,
+    // pcie_ecam: [0x1000]u8,
+    // pcie_mmio: [0x1000]u8,
 };
 
 pub var perif: Perif = .{
     .debug = @splat(0),
     .ram = @splat(0),
-    .virt_test = @splat(0),
+    // .virt_test = @splat(0),
     .time = @splat(0),
     .clint = @splat(0),
-    .Pio = @splat(0),
-    .virt_plic = @splat(0),
+    // .Pio = @splat(0),
+    // .virt_plic = @splat(0),
     .uart = @splat(0),
-    .mmio = @splat(0),
-    .pcie_ecam = @splat(0),
-    .pcie_mmio = @splat(0),
+    // .mmio = @splat(0),
+    // .pcie_ecam = @splat(0),
+    // .pcie_mmio = @splat(0),
 };
 
 pub fn syscall() !void {
@@ -48,6 +47,14 @@ pub fn syscall() !void {
 }
 
 pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8 } {
+    switch (addr) {
+        0x100...0xfff => {},
+        0x10000000...0x10000fff => {},
+        0x80000000...0x800fffff => {},
+        else => {
+            return Err.BadAdress;
+        },
+    }
     const base: u32, const mem: []u8 = switch (addr + byte_nb - 1) {
         0...0xfff => .{ 0, perif.debug[0..] },
         0x10000000...0x10000fff => .{ 0x10000000, perif.uart[0..] },

@@ -5,6 +5,11 @@ const op = @import("op.zig");
 const INSTRUCTION = op.INSTRUCTION;
 pub var pc: u32 = 0;
 
+const Err = error{
+    Decode,
+    UnknownInstruction,
+    InvalidFunc3,
+};
 
 fn decode(instr: u32, debug: bool) !void {
     const instruction: INSTRUCTION = @bitCast(instr);
@@ -53,11 +58,7 @@ fn decode(instr: u32, debug: bool) !void {
         0x13 => {
             switch (instruction.I.func3) {
                 0 => {
-                    if (instruction.R.func7 == 0x20) {
-                        op._I(instruction.I, op.sub);
-                    } else {
-                        op._I(instruction.I, op.add);
-                    }
+                    op._I(instruction.I, op.add);
                 },
                 1 => {
                     op._I(instruction.I, op.sll);
@@ -87,7 +88,7 @@ fn decode(instr: u32, debug: bool) !void {
             }
         },
         3 => {
-            op._load(instruction.I);
+            try op._load(instruction.I);
         },
         0x63 => {
             //B
@@ -120,6 +121,8 @@ fn decode(instr: u32, debug: bool) !void {
                 } else if (instruction.I.imm == 1) {
                     //ebreak 0x00100073
                 }
+            } else {
+                return Err.Decode;
             }
         },
         0xf => {
@@ -130,11 +133,14 @@ fn decode(instr: u32, debug: bool) !void {
             // I (entrée), O (sortie), R (lecture) et W (écriture),
             //avec I = bit 3 et W = bit 0
         },
-        else => {},
+        else => {
+            return Err.UnknownInstruction;
+        },
     }
     if (flag == false) {
         pc += 4;
     }
+    bus.regs[0] = 0; // force x0 à 0
 }
 
 pub fn fetch(instr_size: u8, debug: bool) !void {

@@ -36,7 +36,7 @@ pub fn syscall6(
         : .{ .rcx = true, .r11 = true, .memory = true });
 }
 
-const Err = enum {
+const Err = error {
     SYSCALL_UNSUPPORTED,
 };
 
