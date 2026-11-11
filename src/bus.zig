@@ -49,9 +49,9 @@ pub fn syscall() !void {
 
 pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8 } {
     const base: u32, const mem: []u8 = switch (addr + byte_nb - 1) {
-        0...0x1000 => .{ 0, perif.debug[0..] },
-        0x10000000...0x10001000 => .{ 0x10000000, perif.uart[0..] },
-        0x80000000...0x80100000 => .{ 0x80000000, perif.ram[0..] },
+        0...0xfff => .{ 0, perif.debug[0..] },
+        0x10000000...0x10000fff => .{ 0x10000000, perif.uart[0..] },
+        0x80000000...0x800fffff => .{ 0x80000000, perif.ram[0..] },
         else => return Err.BadAdress,
     };
     const offset = addr - base;
