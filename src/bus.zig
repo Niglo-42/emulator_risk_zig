@@ -1,11 +1,15 @@
 const std = @import("std");
 const print = std.debug.print;
+const def_reg = @import("data/define_regs.zig");
+const sys = @import("syscall.zig");
+
 
 const Err = error{
     Byte_Size_Err,
     BadAdress,
 };
 
+pub var regs: [32]u32 = @splat(0);
 pub const RAM_BASE = 0x80000000;
 
 pub const Perif = struct {
@@ -36,7 +40,14 @@ pub var perif: Perif = .{
     .pcie_mmio = @splat(0),
 };
 
-pub fn get_addr(addr: u32, byte_nb: u32) !struct {u32, []u8}{
+pub fn syscall() !void {
+    regs[def_reg.a7] = sys.translate(regs[def_reg.a7]) catch 1;
+    const flags: u16 = @truncate(regs[def_reg.a7]);
+    regs[def_reg.a7] = regs[def_reg.a7] & 0x3ff;
+    try sys.read_flags(flags, &regs);
+}
+
+pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8 } {
     const base: u32, const mem: []u8 = switch (addr + byte_nb - 1) {
         0...0x1000 => .{ 0, perif.debug[0..] },
         0x10000000...0x10001000 => .{ 0x10000000, perif.uart[0..] },
@@ -44,7 +55,7 @@ pub fn get_addr(addr: u32, byte_nb: u32) !struct {u32, []u8}{
         else => return Err.BadAdress,
     };
     const offset = addr - base;
-    return .{offset, mem};
+    return .{ offset, mem };
 }
 
 pub fn fetch_mem(addr: u32, byte_size: u32) !u32 {

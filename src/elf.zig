@@ -3,7 +3,7 @@ const print_err = @import("data/errors.zig");
 const std = @import("std");
 const print = std.debug.print;
 const spec = @import("data/spec.zig");
-const main = @import("main.zig");
+const fetch = @import("fetch_and_decode.zig");
 const bus = @import("bus.zig");
 
 pub fn bytes_reader(buffer: []u8) u32 {
@@ -16,12 +16,11 @@ pub fn bytes_reader(buffer: []u8) u32 {
     return result;
 }
 
-pub fn parse_elf(buffer: []u8, regs: []u32) void {
+pub fn parse_elf(buffer: []u8) void {
     if (buffer.len < 52) {
         print_err.error_handeling(
             @truncate(buffer.len),
             52,
-            regs,
             "header_too_short",
         );
     }
@@ -35,7 +34,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
             print_err.error_handeling(
                 @as(u32, byte),
                 @as(u32, cmp),
-                regs,
+
                 "wrong_magic",
             );
         }
@@ -45,7 +44,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
             print_err.error_handeling(
                 @as(u32, byte),
                 @as(u32, 1),
-                regs,
+
                 "wrong_oct 4..7",
             );
         }
@@ -54,7 +53,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
         print_err.error_handeling(
             bytes_reader(buffer[18..20]),
             @as(u32, 243),
-            regs,
+
             "wrong_machine",
         );
     }
@@ -63,7 +62,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
         print_err.error_handeling(
             bytes_reader(buffer[20..24]),
             1,
-            regs,
+
             "wrong_machine_type",
         );
     }
@@ -72,11 +71,11 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
         print_err.error_handeling(
             entry,
             0x80000000,
-            regs,
+
             "entry out of bound",
         );
     } else {
-        main.pc = entry;
+        fetch.pc  = entry;
     }
 
     // const e_shoff = bytes_reader(buffer[32..36]);
@@ -95,7 +94,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
         print_err.error_handeling(
             e_phoff,
             52,
-            regs,
+
             "bad_program_header_offset",
         );
     }
@@ -104,7 +103,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
         print_err.error_handeling(
             e_flags,
             0,
-            regs,
+
             "wrong_flag",
         );
     }
@@ -113,7 +112,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
         print_err.error_handeling(
             e_phentsize,
             32,
-            regs,
+
             "wrong_phentsize",
         );
     }
@@ -122,7 +121,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
         print_err.error_handeling(
             e_ehsize,
             52,
-            regs,
+
             "wrong_ehsize",
         );
     }
@@ -130,7 +129,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
         print_err.error_handeling(
             e_phnum,
             1,
-            regs,
+
             "wrong_phnum",
         );
     }
@@ -147,7 +146,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
             print_err.error_handeling(
                 p_h.p_filesz,
                 1,
-                regs,
+
                 "file image has to < memory image",
             );
         }
@@ -155,7 +154,7 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
             print_err.error_handeling(
                 p_h.p_paddr + p_h.p_memsz,
                 bus.perif.ram.len - 1 + bus.RAM_BASE,
-                regs,
+
                 "out of ram !",
             );
         }
@@ -163,9 +162,6 @@ pub fn parse_elf(buffer: []u8, regs: []u32) void {
         @memcpy(bus.perif.ram[dest .. dest + p_h.p_filesz], buffer[p_h.p_offset .. p_h.p_offset + p_h.p_filesz]);
         @memset(bus.perif.ram[dest + p_h.p_filesz .. dest + p_h.p_memsz], 0);
         // todo verif si entry est dedans
-    }
-    if (regs[def_reg.a0] == 1) {
-        std.process.exit(1);
     }
 }
 

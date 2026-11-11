@@ -5,9 +5,7 @@ const print = std.debug.print;
 pub fn error_handeling(
     bad_value: u32,
     expected_val: u32,
-    regs: []u32,
     error_type: []const u8,
 ) void {
-    regs[def_reg.a0] = 1;
     print("error {s}: {X}, expected: {X}\n", .{ error_type, bad_value, expected_val });
 }

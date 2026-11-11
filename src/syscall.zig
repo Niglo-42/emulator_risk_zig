@@ -1,6 +1,19 @@
 const std = @import("std");
 const print = std.debug.print;
 const bus = @import("bus.zig");
+const def_reg = @import("data/define_regs.zig");
+
+pub fn syscall() void {
+    bus.regs[def_reg.a0] = syscall6(
+        bus.regs[def_reg.a7],
+        bus.regs[def_reg.a0],
+        bus.regs[def_reg.a1],
+        bus.regs[def_reg.a2],
+        bus.regs[def_reg.a3],
+        bus.regs[def_reg.a4],
+        bus.regs[def_reg.a5],
+    );
+}
 
 pub fn syscall6(
     number: u32,
