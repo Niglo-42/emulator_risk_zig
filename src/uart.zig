@@ -32,6 +32,9 @@ const ring_buffer = struct {
             0 => {
                 return self.guest_read();
             },
+            5 => {
+                return self.passiv_regs[offset];
+            },
             else => {
                 return self.passiv_regs[offset];
             },

@@ -57,8 +57,8 @@ pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8, kind } {
         },
     }
     const base: u32, const mem: []u8, const t: kind = switch (addr + byte_nb - 1) {
-        0x100...0xfff => .{ 0, perif.debug[0..], kind.DEBUG },
-        0x10000000...0x10000fff => .{ 0x10000000, uart.uart.passiv_regs[0..], kind.UART },
+        0x100...0xfff => .{ 0x100, perif.debug[0..], kind.DEBUG },
+        0x10000000...0x10000007 => .{ 0x10000000, uart.uart.passiv_regs[0..], kind.UART },
         0x80000000...0x800fffff => .{ 0x80000000, perif.ram[0..], kind.RAM },
         else => return Err.BadAdress,
     };

@@ -2,6 +2,7 @@ const sys = @import("syscall.zig");
 const bus = @import("bus.zig");
 const dbg = @import("dbg.zig");
 const op = @import("op.zig");
+const stdin = @import("stdin.zig");
 const INSTRUCTION = op.INSTRUCTION;
 pub var pc: u32 = 0;
 
@@ -143,8 +144,13 @@ fn decode(instr: u32, debug: bool) !void {
 }
 
 pub fn fetch(instr_size: u8, debug: bool) !void {
+    var compteur: u4 = 0;
     while (true) {
+        if (compteur == 0) {
+            try stdin.serve_the_world();
+        }
         try decode(try bus.fetch_mem(pc, instr_size), debug);
+        compteur = compteur +% 1;
     }
     if (debug) {
         dbg.print_regs();

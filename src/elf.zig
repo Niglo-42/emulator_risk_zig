@@ -12,7 +12,7 @@ pub fn bytes_reader(buffer: []u8) u32 {
     return result;
 }
 
-pub fn parse_elf(buffer: []u8) !void {
+pub fn parse_elf(buffer: []u8) ![]struct { u32, u32 } {
     if (buffer.len < 52) {
         try print_err.error_handeling(
             @truncate(buffer.len),
@@ -71,7 +71,7 @@ pub fn parse_elf(buffer: []u8) !void {
             "entry out of bound",
         );
     } else {
-        fetch.pc  = entry;
+        fetch.pc = entry;
     }
 
     // const e_shoff = bytes_reader(buffer[32..36]);
@@ -129,6 +129,7 @@ pub fn parse_elf(buffer: []u8) !void {
             "wrong_phnum",
         );
     }
+    var res: [0x1000]struct { u32, u32 } = undefined;
     for (0..e_phnum) |i| {
         const p_h = prog_header.init(buffer[e_phoff + i * e_phentsize ..][0..32]);
         if (p_h.p_type != 1) {
@@ -155,7 +156,7 @@ pub fn parse_elf(buffer: []u8) !void {
             );
         }
         if (p_h.p_paddr < bus.RAM_BASE) {
-                try print_err.error_handeling(
+            try print_err.error_handeling(
                 p_h.p_paddr,
                 bus.RAM_BASE,
                 "out of ram !",
@@ -164,8 +165,10 @@ pub fn parse_elf(buffer: []u8) !void {
         const dest = p_h.p_paddr - bus.RAM_BASE;
         @memcpy(bus.perif.ram[dest .. dest + p_h.p_filesz], buffer[p_h.p_offset .. p_h.p_offset + p_h.p_filesz]);
         @memset(bus.perif.ram[dest + p_h.p_filesz .. dest + p_h.p_memsz], 0);
+        res[i] = .{ p_h.p_filesz - dest, p_h.p_memsz - dest };
         // todo verif si entry est dedans
     }
+    return res[0..e_phnum];
 }
 
 const prog_header = struct {

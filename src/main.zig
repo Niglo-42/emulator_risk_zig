@@ -2,6 +2,9 @@ const std = @import("std");
 const elf = @import("elf.zig");
 const launch = @import("fetch_and_decode.zig");
 const Err = error{BinPathIsMissing};
+const stdin = @import("stdin.zig");
+var orig_termios: std.os.linux.termios = undefined;
+
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
     const args = try init.minimal.args.toSlice(arena);
@@ -9,6 +12,9 @@ pub fn main(init: std.process.Init) !void {
     if (args.len < 2) {
         return Err.BinPathIsMissing;
     }
+    orig_termios, _ = try stdin.enableRawMode();
+    defer stdin.disableRawMode(orig_termios);
+
     const file = try opener.openFile(init.io, args[1], .{});
     var debug = false;
     if (args.len == 3) {
@@ -20,6 +26,11 @@ pub fn main(init: std.process.Init) !void {
     const buffer = try arena.alloc(u8, size);
     defer arena.free(buffer);
     _ = try file.readPositionalAll(init.io, buffer, 0);
-    try elf.parse_elf(buffer);
+    const elf_report = try elf.parse_elf(buffer);
+    if (debug) {
+        for (elf_report) |tup| {
+            std.debug.print("text: {d}octs, bss: {d}octs\n", tup);
+        }
+    }
     try launch.fetch(4, debug);
 }
