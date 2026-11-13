@@ -12,8 +12,6 @@ pub fn main(init: std.process.Init) !void {
     if (args.len < 2) {
         return Err.BinPathIsMissing;
     }
-    orig_termios, _ = try stdin.enableRawMode();
-    defer stdin.disableRawMode(orig_termios);
 
     const file = try opener.openFile(init.io, args[1], .{});
     var debug = false;
@@ -32,5 +30,7 @@ pub fn main(init: std.process.Init) !void {
             std.debug.print("text: {d}octs, bss: {d}octs\n", tup);
         }
     }
+    orig_termios, _ = try stdin.enableRawMode();
+    defer stdin.disableRawMode(orig_termios);
     try launch.fetch(4, debug);
 }

@@ -12,7 +12,7 @@ const Err = error{
     InvalidFunc3,
 };
 
-fn decode(instr: u32, debug: bool) !void {
+fn decode(instr: u32, debug: bool, run: *bool) !void {
     const instruction: INSTRUCTION = @bitCast(instr);
     if (debug) {
         dbg.disassembly(instruction);
@@ -117,6 +117,9 @@ fn decode(instr: u32, debug: bool) !void {
             //ecall = 0x73 pure
             if (instruction.I.func3 == 0) {
                 if (instruction.I.get_imm() == 0) {
+                    if (bus.regs[17] == 93) {
+                        run.* = false;
+                    }
                     try sys.syscall();
                 } else if (instruction.I.imm == 1) {
                     //ebreak 0x00100073
@@ -145,11 +148,12 @@ fn decode(instr: u32, debug: bool) !void {
 
 pub fn fetch(instr_size: u8, debug: bool) !void {
     var compteur: u4 = 0;
-    while (true) {
+    var run = true;
+    while (run) {
         if (compteur == 0) {
             try stdin.serve_the_world();
         }
-        try decode(try bus.fetch_mem(pc, instr_size), debug);
+        try decode(try bus.fetch_mem(pc, instr_size), debug, &run);
         compteur = compteur +% 1;
     }
     if (debug) {

@@ -10,6 +10,6 @@ int main(void){
             buf[i++] = uart[0];
     }
     for (int j = 0; j < 5; j++)
-        uart[0] = buf[j];
+        *uart = buf[j];
     return 0;
 }
