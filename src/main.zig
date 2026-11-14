@@ -3,9 +3,14 @@ const elf = @import("elf.zig");
 const launch = @import("fetch_and_decode.zig");
 const Err = error{BinPathIsMissing};
 const stdin = @import("stdin.zig");
+const bus = @import("bus.zig");
 var orig_termios: std.os.linux.termios = undefined;
+pub var stdout: std.Io.File = undefined;
+pub var io: std.process.Init = undefined;
 
 pub fn main(init: std.process.Init) !void {
+    io = init;
+    stdout = std.Io.File.stdout();
     const arena = init.arena.allocator();
     const args = try init.minimal.args.toSlice(arena);
     const opener = std.Io.Dir.cwd();
@@ -33,4 +38,5 @@ pub fn main(init: std.process.Init) !void {
     orig_termios, _ = try stdin.enableRawMode();
     defer stdin.disableRawMode(orig_termios);
     try launch.fetch(4, debug);
+    // return bus.regs[10];
 }

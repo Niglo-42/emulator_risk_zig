@@ -119,6 +119,7 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
                 if (instruction.I.get_imm() == 0) {
                     if (bus.regs[17] == 93) {
                         run.* = false;
+                        return;
                     }
                     try sys.syscall();
                 } else if (instruction.I.imm == 1) {
@@ -147,7 +148,7 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
 }
 
 pub fn fetch(instr_size: u8, debug: bool) !void {
-    var compteur: u4 = 0;
+    var compteur: u16 = 0;
     var run = true;
     while (run) {
         if (compteur == 0) {

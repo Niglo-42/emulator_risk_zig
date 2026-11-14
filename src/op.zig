@@ -15,9 +15,6 @@ pub fn _I(instr: I, f: fn (u32, u32) u32) void {
 }
 
 pub fn _load(instr: I) !void {
-    if (instr.rd == 0) {
-        return;
-    }
     const mask: u32 = switch (instr.func3) {
         0 => 0xffffff00, //lb
         1 => 0xffff0000, //lh
@@ -32,14 +29,16 @@ pub fn _load(instr: I) !void {
     const addr = bus.regs[instr.rs1] +% instr.get_imm();
     const data: u32 = try bus.fetch_mem(addr, size);
     const neg: u5 = @truncate(size * 8 - 1);
-    if (instr.func3 > 1) // si unsigned
-    {
-        bus.regs[instr.rd] = data;
-    } else {
-        if ((data >> neg) == 1) {
-            bus.regs[instr.rd] = mask | data;
-        } else {
+    if (instr.rd != 0) {
+        if (instr.func3 > 1) // si unsigned
+        {
             bus.regs[instr.rd] = data;
+        } else {
+            if ((data >> neg) == 1) {
+                bus.regs[instr.rd] = mask | data;
+            } else {
+                bus.regs[instr.rd] = data;
+            }
         }
     }
 }

@@ -4,14 +4,17 @@ const linux = std.os.linux;
 const posix = std.posix;
 const STDOUT_FILENO = posix.STDOUT_FILENO;
 const STDIN_FILENO = posix.STDIN_FILENO;
+const main = @import("main.zig");
 
 const Err = error {
     Fail2Read,
+    NotaTerminal,
 };
 
 pub fn enableRawMode() !struct{linux.termios, linux.termios} {
     const orig_termios = try posix.tcgetattr(STDIN_FILENO);
     var termios = orig_termios;
+    if (try main.stdout.isTty(main.io.io)) {
     termios.lflag.ECHO = false;
     termios.lflag.ICANON = false;
     termios.iflag.IXON = false; // disable Ctrl-S and Ctrl-Q signals
@@ -25,6 +28,7 @@ pub fn enableRawMode() !struct{linux.termios, linux.termios} {
     termios.cc[@intFromEnum(linux.V.MIN)] = 0; // Return immediately when any bytes are available
     termios.cc[@intFromEnum(linux.V.TIME)] = 0; // Wait up to 0 seconds for input
     posix.tcsetattr(STDIN_FILENO, .FLUSH, termios) catch @panic("Disabling raw mode failed!");
+    }
     return .{orig_termios, termios};
 }
 
