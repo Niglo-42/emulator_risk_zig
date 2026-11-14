@@ -11,25 +11,27 @@ const Err = error {
     NotaTerminal,
 };
 
-pub fn enableRawMode() !struct{linux.termios, linux.termios} {
-    const orig_termios = try posix.tcgetattr(STDIN_FILENO);
-    var termios = orig_termios;
-    if (try main.stdout.isTty(main.io.io)) {
-    termios.lflag.ECHO = false;
-    termios.lflag.ICANON = false;
-    termios.iflag.IXON = false; // disable Ctrl-S and Ctrl-Q signals
-    termios.lflag.IEXTEN = false; // disable Ctrl-V
-    // termios.oflag.OPOST = false; // disable the famous \r before the \n
+pub fn enableRawMode() !?linux.termios {
+    if (try main.in.isTty(main.io.io) == true) {
+        const orig_termios = try posix.tcgetattr(STDIN_FILENO);
+        var termios = orig_termios;
+        termios.lflag.ECHO = false;
+        termios.lflag.ICANON = false;
+        termios.iflag.IXON = false; // disable Ctrl-S and Ctrl-Q signals
+        termios.lflag.IEXTEN = false; // disable Ctrl-V
+        // termios.oflag.OPOST = false; // disable the famous \r before the \n
 
-    termios.iflag.INPCK = false; // disable parity checking (obsolete?)
-    termios.iflag.ISTRIP = false; // disable stripping of 8th bit
-    termios.cflag.CSIZE = .CS8; // set character size to 8 bits
-    // Set read timeouts
-    termios.cc[@intFromEnum(linux.V.MIN)] = 0; // Return immediately when any bytes are available
-    termios.cc[@intFromEnum(linux.V.TIME)] = 0; // Wait up to 0 seconds for input
-    posix.tcsetattr(STDIN_FILENO, .FLUSH, termios) catch @panic("Disabling raw mode failed!");
+        termios.iflag.INPCK = false; // disable parity checking (obsolete?)
+        termios.iflag.ISTRIP = false; // disable stripping of 8th bit
+        termios.cflag.CSIZE = .CS8; // set character size to 8 bits
+        // Set read timeouts
+        termios.cc[@intFromEnum(linux.V.MIN)] = 0; // Return immediately when any bytes are available
+        termios.cc[@intFromEnum(linux.V.TIME)] = 0; // Wait up to 0 seconds for input
+        posix.tcsetattr(STDIN_FILENO, .FLUSH, termios) catch @panic("Disabling raw mode failed!");
+        return orig_termios;
+    } else {
+        return null;
     }
-    return .{orig_termios, termios};
 }
 
 /// Disable terminal raw mode by restoring the saved configuration.
