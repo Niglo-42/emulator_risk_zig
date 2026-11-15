@@ -8,6 +8,7 @@ var orig_termios: ?std.os.linux.termios = undefined;
 pub var in: std.Io.File = undefined;
 pub var io: std.process.Init = undefined;
 const screen = @import("screen.zig");
+pub var flag = std.atomic.Value(bool).init(false);
 
 pub fn main(init: std.process.Init) !void {
     io = init;
@@ -38,6 +39,9 @@ pub fn main(init: std.process.Init) !void {
     }
     orig_termios = try stdin.enableRawMode();
     defer stdin.disableRawMode(orig_termios);
-    try launch.fetch(4, debug);
-    try screen.window();
+    const alloc = std.heap.page_allocator;
+    const spawn_conf = std.Thread.SpawnConfig{ .allocator = alloc };
+    const thread= try std.Thread.spawn(spawn_conf, launch.fetch, .{ 4, debug });
+    try screen.screen.window();
+    thread.join();
 }

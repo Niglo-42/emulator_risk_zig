@@ -1,4 +1,6 @@
 const rl = @import("raylib");
+const main = @import("main.zig");
+const std = @import("std");
 
 const RGBA = enum {
     A,
@@ -7,15 +9,15 @@ const RGBA = enum {
     R,
 };
 
-pub var screen = Screen.init(1536, 864);
+pub var screen = Screen.init(1920, 1080);
 
 const Screen = struct {
     view: [0x1000000]u8, // dynamik ?
-    width: u32,
-    height: u32,
+    width: i32,
+    height: i32,
 
-    pub fn init(h: u32, w: u32) Screen {
-        if (h * w > 0x1000000) // 16 mo
+    pub fn init(h: i32, w: i32) Screen {
+        if (h * w > 0x1000000) {} // 16 mo
         return Screen{
             .view = @splat(0),
             .width = w,
@@ -23,17 +25,50 @@ const Screen = struct {
         };
     }
 
-    pub fn window(self: Screen) anyerror!void {
-    rl.initWindow(self.width, self.height, "my vm");
-    defer rl.closeWindow(); // Close window and OpenGL context
-    rl.setTargetFPS(60);
-    while (!rl.windowShouldClose()) { // Detect window close button or ESC key
-        rl.beginDrawing();
-        defer rl.endDrawing();
-        rl.clearBackground(.white);
-        rl.drawText("Congrats! You created your first window!", 190, 200, 20, .light_gray);
+    pub fn window(self: *Screen) !void {
+        const width = self.width;
+        const height = self.height;
+        rl.initWindow(height, width, "my vm");
+        defer rl.closeWindow();
+
+        // Taille réelle du framebuffer utilisé par la texture
+        const pixel_size: usize = @as(usize, @intCast(width)) * @as(usize, @intCast(height)) * 4;
+
+        if (self.view.len < pixel_size) {
+            return error.InvalidFramebufferSize;
+        }
+
+        const frame_buffer = self.view[0..].ptr;
+
+        // Image qui pointe directement sur la RAM de ta VM
+        const image: rl.Image = .{
+            .data = @ptrCast(frame_buffer),
+            .width = width,
+            .height = height,
+            .format = .uncompressed_r8g8b8a8,
+            .mipmaps = 1,
+        };
+
+        // Upload initial et création de la texture GPU
+        const texture = try rl.loadTextureFromImage(image);
+        defer rl.unloadTexture(texture);
+
+        rl.setTargetFPS(60);
+
+        while (!rl.windowShouldClose()) {
+            if (main.flag.load(.seq_cst)) return;
+
+            // Upload du framebuffer RAM vers la texture GPU
+            rl.updateTexture(texture, @ptrCast(frame_buffer));
+
+            rl.beginDrawing();
+            rl.clearBackground(.black);
+
+            rl.drawTexture(texture, 0, 0, .white);
+
+            rl.endDrawing();
+        }
+
+        main.flag.store(true, .seq_cst);
     }
-}
 };
-
-

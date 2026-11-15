@@ -3,6 +3,8 @@ const bus = @import("bus.zig");
 const dbg = @import("dbg.zig");
 const op = @import("op.zig");
 const stdin = @import("stdin.zig");
+const main = @import("main.zig");
+const std = @import("std");
 const INSTRUCTION = op.INSTRUCTION;
 pub var pc: u32 = 0;
 
@@ -151,6 +153,9 @@ pub fn fetch(instr_size: u8, debug: bool) !void {
     var compteur: u16 = 0;
     var run = true;
     while (run) {
+        if (main.flag.load(.seq_cst) == true) {
+            break;
+        }
         if (compteur == 0) {
             try stdin.serve_the_world();
         }
@@ -160,4 +165,5 @@ pub fn fetch(instr_size: u8, debug: bool) !void {
     if (debug) {
         dbg.print_regs();
     }
+    main.flag.store(true, .seq_cst);
 }
