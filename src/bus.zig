@@ -3,6 +3,7 @@ const print = std.debug.print;
 const def_reg = @import("data/define_regs.zig");
 const sys = @import("syscall.zig");
 const uart = @import("uart.zig");
+const screen = @import("screen.zig");
 const Err = error{
     Byte_Size_Err,
     BadAdress,
@@ -16,7 +17,6 @@ pub const RAM_BASE = 0x80000000;
 pub const Perif = struct {
     debug: [0xf00]u8,
     ram: [0x100000]u8, // 1mo
-    // virt_test: [0x1000]u8,
     time: [0x1000]u8,
     clint: [0x10000]u8,
     // Pio: [0x10000]u8,
@@ -30,7 +30,6 @@ pub const Perif = struct {
 pub var perif: Perif = .{
     .debug = @splat(0),
     .ram = @splat(0),
-    // .virt_test = @splat(0),
     .time = @splat(0),
     .clint = @splat(0),
     // .Pio = @splat(0),
@@ -45,11 +44,13 @@ pub const kind = enum {
     DEBUG,
     UART,
     RAM,
+    SCREEN,
 };
 
 pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8, kind } {
     switch (addr) {
         0x100...0xfff => {},
+        0x1000...0x1000fff => {},
         0x10000000...0x10000007 => {},
         0x80000000...0x800fffff => {},
         else => {
@@ -58,6 +59,7 @@ pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8, kind } {
     }
     const base: u32, const mem: []u8, const t: kind = switch (addr + byte_nb - 1) {
         0x100...0xfff => .{ 0x100, perif.debug[0..], kind.DEBUG },
+        0x1000...0x1000fff => .{0x1000, screen.screen.view[0..], kind.SCREEN},
         0x10000000...0x10000007 => .{ 0x10000000, uart.uart.passiv_regs[0..], kind.UART },
         0x80000000...0x800fffff => .{ 0x80000000, perif.ram[0..], kind.RAM },
         else => return Err.BadAdress,

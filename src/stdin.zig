@@ -35,8 +35,10 @@ pub fn enableRawMode() !?linux.termios {
 }
 
 /// Disable terminal raw mode by restoring the saved configuration.
-pub fn disableRawMode(orig_termios: linux.termios) void {
-    posix.tcsetattr(STDIN_FILENO, .FLUSH, orig_termios) catch @panic("Disabling raw mode failed!");
+pub fn disableRawMode(orig_termios: ?linux.termios) void {
+    if (orig_termios) |termios| {
+        posix.tcsetattr(STDIN_FILENO, .FLUSH, termios) catch @panic("Disabling raw mode failed!");
+    }
 }
 
 pub fn serve_the_world() !void {
@@ -50,28 +52,3 @@ pub fn serve_the_world() !void {
         _ = try uart.uart.host_write(buf[i]);
     }
 }
-
-
-// Ton main est correct pour deux cas : le retour normal
-//  et les erreurs remontées par try. Dans les deux, le defer restaure le 
-//  terminal. Mais trois sorties le contournent.
-
-// L’exit de l’invité. Ton start.s finit par un ecall de sortie, que ta table
-//  traduit en appel système hôte. Le processus meurt sur place, sans exécuter
-//   le defer. C’est le cas le plus courant : chaque programme invité qui se termine
-//    normalement laisse ton shell en mode brut. La solution propre est que la sortie
-//     de l’invité ne tue pas l’émulateur : elle lève un drapeau, ta boucle while 
-//     (true) s’arrête, fetch rend la main, et le defer de main s’exécute.
-// Ctrl-C. Le signal tue le processus sans defer. Le plus simple dans ton design
-//  : désactiver ISIG, et traiter l’octet 3 dans serve_the_world comme une touche 
-//  d’arrêt de l’émulateur, qui lève le même drapeau. Tu évites ainsi d’écrire un gestionnaire de signal.
-// Les paniques. Un dépassement d’indice ou un @panic ne restaure rien non plus.
-//  Là, stty sane reste ta roue de secours.
-
-// Deux remarques moins urgentes :
-
-// stdin redirigé. try stdin.enableRawMode() échoue si stdin est un tube, donc 
-// l’émulateur refuse de démarrer. Tu en auras besoin pour le test abcq de l’étape 7 
-// : en cas d’échec, continue sans mode brut et ne restaure rien à la sortie.
-// Le moment de l’activation. Tu passes en mode brut avant de charger l’ELF. 
-// Fais-le juste avant fetch, pour que les erreurs de chargement s’affichent dans un terminal normal.

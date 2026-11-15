@@ -7,6 +7,7 @@ const bus = @import("bus.zig");
 var orig_termios: ?std.os.linux.termios = undefined;
 pub var in: std.Io.File = undefined;
 pub var io: std.process.Init = undefined;
+const screen = @import("screen.zig");
 
 pub fn main(init: std.process.Init) !void {
     io = init;
@@ -36,7 +37,7 @@ pub fn main(init: std.process.Init) !void {
         }
     }
     orig_termios = try stdin.enableRawMode();
-    if (orig_termios != null){defer stdin.disableRawMode(orig_termios.?);}
+    defer stdin.disableRawMode(orig_termios);
     try launch.fetch(4, debug);
-    // return bus.regs[10];
+    try screen.window();
 }
