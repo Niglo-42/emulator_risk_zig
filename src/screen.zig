@@ -9,7 +9,7 @@ const RGBA = enum {
     R,
 };
 
-pub var screen = Screen.init(1920, 1080);
+pub var screen = Screen.init(864, 1536);
 
 const Screen = struct {
     view: [0x1000000]u8, // dynamik ?
@@ -28,7 +28,7 @@ const Screen = struct {
     pub fn window(self: *Screen) !void {
         const width = self.width;
         const height = self.height;
-        rl.initWindow(height, width, "my vm");
+        rl.initWindow(width, height, "my vm");
         defer rl.closeWindow();
 
         // Taille réelle du framebuffer utilisé par la texture
@@ -62,7 +62,6 @@ const Screen = struct {
             rl.updateTexture(texture, @ptrCast(frame_buffer));
 
             rl.beginDrawing();
-            rl.clearBackground(.black);
 
             rl.drawTexture(texture, 0, 0, .white);
 
