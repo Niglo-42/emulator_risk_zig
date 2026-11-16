@@ -56,7 +56,7 @@ const Screen = struct {
         rl.setTargetFPS(60);
 
         while (!rl.windowShouldClose()) {
-            if (main.flag.load(.seq_cst)) return;
+            if (main.flag.load(.monotonic)) return;
 
             // Upload du framebuffer RAM vers la texture GPU
             rl.updateTexture(texture, @ptrCast(frame_buffer));
@@ -68,6 +68,6 @@ const Screen = struct {
             rl.endDrawing();
         }
 
-        main.flag.store(true, .seq_cst);
+        main.flag.store(true, .monotonic);
     }
 };

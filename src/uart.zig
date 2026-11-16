@@ -56,24 +56,26 @@ const ring_buffer = struct {
     }
 
     pub fn host_write(self: *ring_buffer, val: u8) !u8 {
-        const res: u8 = @truncate(CAP - (self.write_h.load(.monotonic) - self.read_h.load(.acquire)));
+        const w = self.write_h.load(.monotonic);
+        const r = self.read_h.load(.acquire);
+        const res: u8 = @truncate(CAP - (w - r));
         if ( res == 0) {
             return Err.WriteImpossible;
         }
-        self.queue[self.write_h.load(.monotonic) & (CAP - 1)] = val;
-        const tmp_w = self.write_h.load(.monotonic);
-        self.write_h.store(tmp_w + 1, .seq_cst);
+        self.queue[w & (CAP - 1)] = val;
+        self.write_h.store(w +% 1, .release);
         // self.passiv_regs[5] |= 1; RELICAT
-        return res;
+        return res - 1;
     }
 
     // quand invité lit à uart offset 0 cela est comme une instruction
     // qui déclanche cette fonction. (pour simuler la vrai transaction)
     pub fn guest_read(self: *ring_buffer) ?u8 { 
-        if (self.read_h.load(.monotonic) == self.write_h.load(.acquire)) {return null;}
-        const res = self.queue[self.read_h.load(.monotonic) & (CAP - 1)];
-        const tmp_r = self.read_h.load(.monotonic);
-        self.read_h.store(tmp_r + 1, .seq_cst);
+        const r = self.read_h.load(.monotonic);
+        const w = self.write_h.load(.acquire);
+        if (w == r) {return null;}
+        const res = self.queue[r & (CAP - 1)];
+        self.read_h.store(r +% 1, .release);
         // if (self.read_h == self.write_h) {
         //     self.passiv_regs[5] &= 0xfe; // RELICAT
         // }
