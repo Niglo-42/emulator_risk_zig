@@ -81,6 +81,11 @@ fn decode_utf8() void {}
 //  comme si getCharPressed renvoyait déjà les octets UTF-8 et qu’il suffisait de les découper.
 //   Ce n’est pas le cas : pour « é », key vaut 233, soit 0xE9.
 //    C’est le numéro Unicode du caractère. 0xC3 0xA9 est ce que tu dois fabriquer.
+
+// Combien de bits utiles ? 233 s’écrit 1110 1001, soit 8 bits significatifs.
+// Quel format ? Chaque format offre un nombre fixe de bits de données :
+// 7 bits pour 1 octet, 11 pour 2 octets, 16 pour 3 octets, 21 pour 4 octets.
+
 fn encode_utf8(key: i32) !void {
     // Octet qui commence par 0 : un caractère ASCII complet, en un seul octet (0 à 127).
     // Octet qui commence par 110 : début d’un caractère de 2 octets.
@@ -104,5 +109,5 @@ fn encode_utf8(key: i32) !void {
                 return;
             }
         }
-    } // 0x00 0x00 0xC3 0xA9 -> 1100.0011..1010.1001
+    } // 0x00 0x00 0xC3 0xA9 -> 1100.0011..1010.1001 faux ! c'est 233
 }
