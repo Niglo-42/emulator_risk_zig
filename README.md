@@ -58,3 +58,5 @@ sudo apt update
 sudo apt install libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxi-dev libxcursor-dev
 
 pour lancer le duo fenetre + uart zig build run -Doptimize=ReleaseFast -- src/input/draw_pixels.elf
+
+ressource ring buffer atomique https://rigtorp.se/ringbuffer.cpp
