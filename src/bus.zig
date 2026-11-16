@@ -4,6 +4,7 @@ const def_reg = @import("data/define_regs.zig");
 const sys = @import("syscall.zig");
 const uart = @import("uart.zig");
 const screen = @import("screen.zig");
+const utf8 = @import("utf_8.zig");
 const Err = error{
     Byte_Size_Err,
     BadAdress,
@@ -47,6 +48,17 @@ pub const kind = enum {
     SCREEN,
 };
 
+pub fn array2u32(buf: [4]u8) u32 {
+    return @as(u32, buf[0]) | @as(u32, buf[1]) << 8 | @as(u32, buf[2]) << 16 | @as(u32, buf[3]) << 24;
+}
+
+pub fn u32toarray(data: u32, buf: *[4]u8) void {
+    for (0..4) |i| {
+        const shr: u5 = @truncate(i << 3);
+        buf[i] = @truncate(data >> shr);
+    }
+}
+
 pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8, kind } {
     // verifie si addr commence dans une plage connu sinon segfault
     // pareil pour addr + taille de la data
@@ -63,7 +75,7 @@ pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8, kind } {
     }
     const base: u32, const mem: []u8, const t: kind = switch (addr + byte_nb - 1) {
         0x100...0xfff => .{ 0x100, perif.debug[0..], kind.DEBUG },
-        0x1000...0x1000fff => .{0x1000, screen.screen.view[0..], kind.SCREEN},
+        0x1000...0x1000fff => .{ 0x1000, screen.screen.view[0..], kind.SCREEN },
         0x10000000...0x10000007 => .{ 0x10000000, uart.uart.passiv_regs[0..], kind.UART },
         0x80000000...0x800fffff => .{ 0x80000000, perif.ram[0..], kind.RAM },
         else => return Err.BadAdress,
@@ -110,7 +122,10 @@ pub fn store_mem(addr: u32, byte_size: u32, value: u32) !void {
         }
     } else {
         const offsetu3: u3 = @truncate(offset);
-        const byte: u8 = @truncate(value);
-        uart.uart.setter(offsetu3, byte);
+        var buf: [4]u8 = undefined;
+        @memset(&buf, 0);
+        const data: i32 = @bitCast(value);
+        const n = utf8.encode_utf8(data, &buf);
+        uart.uart.setter(offsetu3, &buf[0..n]);
     }
 }

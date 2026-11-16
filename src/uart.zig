@@ -41,16 +41,15 @@ const ring_buffer = struct {
         }
     }
 
-    pub fn setter(self: *ring_buffer, offset: u3, byte: u8) void {
+    pub fn setter(self: *ring_buffer, offset: u3, bytes: *[]u8) void {
         // 0 -> write sur stdout, 5 -> push byte in data reg uart
         switch (offset) {
             0 => {
-                const ptr: [*]const u8 = @ptrCast(&byte);
-                _ = std.os.linux.write(1, ptr, 1);
+                _ = std.os.linux.write(1, bytes, bytes.len);
             },
             5 => {},
             else => {
-                self.passiv_regs[offset] = byte;
+                self.passiv_regs[offset] = bytes[0];
             },
         }
     }

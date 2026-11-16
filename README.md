@@ -56,6 +56,7 @@ dep a ajouter !!
 
 sudo apt update
 sudo apt install libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxi-dev libxcursor-dev
+zig fetch --save git+https://github.com/raylib-zig/raylib-zig#devel
 
 pour lancer le duo fenetre + uart zig build run -Doptimize=ReleaseFast -- src/input/draw_pixels.elf
 
