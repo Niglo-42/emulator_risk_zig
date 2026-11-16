@@ -60,8 +60,9 @@ const ring_buffer = struct {
         if ( res == 0) {
             return Err.WriteImpossible;
         }
-        self.queue[self.write_h & (CAP - 1)] = val;
-        self.write_h += 1;
+        self.queue[self.write_h.load(.monotonic) & (CAP - 1)] = val;
+        const tmp_w = self.write_h.load(.monotonic);
+        self.write_h.store(tmp_w + 1, .seq_cst);
         // self.passiv_regs[5] |= 1; RELICAT
         return res;
     }
@@ -69,9 +70,10 @@ const ring_buffer = struct {
     // quand invité lit à uart offset 0 cela est comme une instruction
     // qui déclanche cette fonction. (pour simuler la vrai transaction)
     pub fn guest_read(self: *ring_buffer) ?u8 { 
-        if (self.read_h == self.write_h) {return null;}
-        const res = self.queue[self.read_h & (CAP - 1)];
-        self.read_h += 1;
+        if (self.read_h.load(.monotonic) == self.write_h.load(.acquire)) {return null;}
+        const res = self.queue[self.read_h.load(.monotonic) & (CAP - 1)];
+        const tmp_r = self.read_h.load(.monotonic);
+        self.read_h.store(tmp_r + 1, .seq_cst);
         // if (self.read_h == self.write_h) {
         //     self.passiv_regs[5] &= 0xfe; // RELICAT
         // }
