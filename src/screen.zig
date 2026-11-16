@@ -53,6 +53,7 @@ const Screen = struct {
             rl.updateTexture(texture, @ptrCast(frame_buffer));
             if (input_mode == true) {
                 while (true) {
+                    // pour toutes les char pressed dans les 16ms
                     const key: i32 = rl.getCharPressed();
                     if (key == 0) {
                         break;
@@ -64,6 +65,7 @@ const Screen = struct {
             rl.beginDrawing();
 
             rl.drawTexture(texture, 0, 0, .white);
+            // rl.drawText();
 
             rl.endDrawing();
         }
@@ -72,6 +74,13 @@ const Screen = struct {
     }
 };
 
+fn decode_utf8() void {}
+// Le malentendu ATTENTION WARNING ACHTUNG !!!
+
+// Ton commentaire final montre que tu attends 0x00 0x00 0xC3 0xA9 dans key,
+//  comme si getCharPressed renvoyait déjà les octets UTF-8 et qu’il suffisait de les découper.
+//   Ce n’est pas le cas : pour « é », key vaut 233, soit 0xE9.
+//    C’est le numéro Unicode du caractère. 0xC3 0xA9 est ce que tu dois fabriquer.
 fn encode_utf8(key: i32) !void {
     // Octet qui commence par 0 : un caractère ASCII complet, en un seul octet (0 à 127).
     // Octet qui commence par 110 : début d’un caractère de 2 octets.
