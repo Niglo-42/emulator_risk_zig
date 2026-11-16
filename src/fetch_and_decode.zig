@@ -150,12 +150,14 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
     bus.regs[0] = 0; // force x0 à 0
 }
 
-pub fn fetch(instr_size: u8, debug: bool) !void {
+pub fn fetch(instr_size: u8, debug: bool, input_mode: bool) !void {
     var compteur: u16 = 0;
     var run = true;
     while (run) {
         if (compteur == 0) {
-            try stdin.serve_the_world();
+            if (input_mode == false) {
+                try stdin.serve_the_world();
+            }
             if (main.flag.load(.monotonic) == true) {
                 break;
             }
