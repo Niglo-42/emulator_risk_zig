@@ -11,15 +11,15 @@ const CAP = 128;
 const ring_buffer = struct {
     queue: [CAP]u8,
     passiv_regs: [8]u8,
-    read_h: usize,
-    write_h: usize,
+    read_h: std.atomic.Value(usize),
+    write_h: std.atomic.Value(usize),
 
     fn init() ring_buffer {
         var x = ring_buffer{
             .queue = @splat(0),
             .passiv_regs = @splat(0),
-            .read_h = 0,
-            .write_h = 0,
+            .read_h = std.atomic.Value(usize).init(0),
+            .write_h = std.atomic.Value(usize).init(0),
         };
         x.passiv_regs[5] = 0x60;
         return x;
@@ -32,7 +32,7 @@ const ring_buffer = struct {
                 return self.guest_read();
             },
             5 => {
-                if (self.read_h == self.write_h) {return 0x60;}
+                if (self.read_h.load(.monotonic) == self.write_h.load(.monotonic)) {return 0x60;}
                 else {return 0x61;}
             },
             else => {
@@ -56,24 +56,25 @@ const ring_buffer = struct {
     }
 
     pub fn host_write(self: *ring_buffer, val: u8) !u8 {
-        if (CAP - (self.write_h - self.read_h) == 0) {
+        const res: u8 = @truncate(CAP - (self.write_h.load(.monotonic) - self.read_h.load(.acquire)));
+        if ( res == 0) {
             return Err.WriteImpossible;
         }
-        self.queue[self.write_h & CAP - 1] = val;
+        self.queue[self.write_h & (CAP - 1)] = val;
         self.write_h += 1;
-        self.passiv_regs[5] |= 1;
-        return @truncate(CAP - (self.write_h - self.read_h));
+        // self.passiv_regs[5] |= 1; RELICAT
+        return res;
     }
 
     // quand invité lit à uart offset 0 cela est comme une instruction
     // qui déclanche cette fonction. (pour simuler la vrai transaction)
     pub fn guest_read(self: *ring_buffer) ?u8 { 
         if (self.read_h == self.write_h) {return null;}
-        const res = self.queue[self.read_h & CAP - 1];
+        const res = self.queue[self.read_h & (CAP - 1)];
         self.read_h += 1;
-        if (self.read_h == self.write_h) {
-            self.passiv_regs[5] &= 0xfe; // plus rien à lire
-        }
+        // if (self.read_h == self.write_h) {
+        //     self.passiv_regs[5] &= 0xfe; // RELICAT
+        // }
         return res;
     }
 };
