@@ -56,6 +56,9 @@ fn translate(number: u32) !struct { u6, u64 } {
 pub const SYSCALL_UNSUPPORTED: u16 = 0xFFFF;
 
 pub fn read_flags(flags: u6, regs_cpy: *[6]u64) !void {
+    // parcours les 6 bits fortes des valeurs venant de RISCV_TO_X64
+    // si flag == true alors c'est un arg adress et donc on ajoute
+    // A l'offset l'adress de son tableau
     for (0..6, 1..) |bit, i| {
         const shr: u3 = @truncate(bit);
         if ((flags >> shr) & 1 == 1) {

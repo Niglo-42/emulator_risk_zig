@@ -48,6 +48,10 @@ pub const kind = enum {
 };
 
 pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8, kind } {
+    // verifie si addr commence dans une plage connu sinon segfault
+    // pareil pour addr + taille de la data
+    // return l'adress host et déduit l'offset réélement demandé
+    // si uart alors check flux == 1  byte
     switch (addr) {
         0x100...0xfff => {},
         0x1000...0x1000fff => {},
@@ -69,14 +73,13 @@ pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8, kind } {
         if (byte_nb != 1) {
             return Err.UartBadByteSize;
         }
-        if (offset > 7) {
-            return Err.UartBadOffset;
-        }
     }
     return .{ offset, mem, t };
 }
 
 pub fn fetch_mem(addr: u32, byte_size: u32) !u32 {
+    // si mem classique alors packing de la data en little endian
+    // si uart, use getter
     if (byte_size != 1 and byte_size != 2 and byte_size != 4) {
         return Err.Byte_Size_Err;
     }
