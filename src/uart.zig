@@ -55,17 +55,17 @@ const ring_buffer = struct {
         }
     }
 
-    pub fn host_write(self: *ring_buffer, val: u8) !u8 {
+    pub fn host_write(self: *ring_buffer, val: u8) i8 {
         const w = self.write_h.load(.monotonic);
         const r = self.read_h.load(.acquire);
         const res: u8 = @truncate(CAP - (w - r));
         if ( res == 0) {
-            return Err.WriteImpossible;
+            return -1;
         }
         self.queue[w & (CAP - 1)] = val;
         self.write_h.store(w +% 1, .release);
         // self.passiv_regs[5] |= 1; RELICAT
-        return res - 1;
+        return @bitCast(res - 1);
     }
 
     // quand invité lit à uart offset 0 cela est comme une instruction

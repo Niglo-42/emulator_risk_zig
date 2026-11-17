@@ -18,7 +18,7 @@ pub fn encode_utf8(data: i32, buf: *[4]u8) u3 {
     // Fin de la plage des surrogate
     // 0x110000
     // Au-delà de la limite Unicode
-    if (data >= 0x110000 or (data >= 0xd800 and data <= 0xdfff)) {
+    if (data >= 0x110000 or (data >= 0xd800 and data <= 0xdfff) or data < 0) {
         return 0;
     }
     const uni: u32 = @bitCast(data);

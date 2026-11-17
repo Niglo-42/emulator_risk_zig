@@ -24,71 +24,113 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
     var flag = false;
     switch (instruction.R.opcode) {
         0x33 => {
-            switch (instruction.R.func3) {
+            switch (instruction.R.func7) {
                 0 => {
-                    if (instruction.R.func7 == 0x20) {
-                        op._R(instruction.R, op.sub);
-                    } else {
-                        op._R(instruction.R, op.add);
+                    switch (instruction.R.func3) {
+                        0 => {
+                            op._R(instruction.R, op.add);
+                        },
+                        1 => {
+                            op._R(instruction.R, op.sll);
+                        },
+                        2 => {
+                            op._R(instruction.R, op.slt);
+                        },
+                        3 => {
+                            op._R(instruction.R, op.sltu);
+                        },
+                        4 => {
+                            op._R(instruction.R, op.xor);
+                        },
+                        5 => {
+                            op._R(instruction.R, op.srl);
+                        },
+                        6 => {
+                            op._R(instruction.R, op.or_);
+                        },
+                        7 => {
+                            op._R(instruction.R, op.and_);
+                        },
                     }
                 },
                 1 => {
-                    op._R(instruction.R, op.sll);
-                },
-                2 => {
-                    op._R(instruction.R, op.slt);
-                },
-                3 => {
-                    op._R(instruction.R, op.sltu);
-                },
-                4 => {
-                    op._R(instruction.R, op.xor);
-                },
-                5 => {
-                    if (instruction.R.func7 == 0x20) {
-                        op._R(instruction.R, op.sra);
-                    } else {
-                        op._R(instruction.R, op.srl);
+                    switch (instruction.R.func3) {
+                        0 => {
+                            op._R(instruction.R, op.mul);
+                        },
+                        1 => {
+                            op._R(instruction.R, op.mulh);
+                        },
+                        2 => {
+                            op._R(instruction.R, op.mulhsu);
+                        },
+                        3 => {
+                            op._R(instruction.R, op.mulhu);
+                        },
+                        4 => {
+                            op._R(instruction.R, op.div);
+                        },
+                        5 => {
+                            op._R(instruction.R, op.divu);
+                        },
+                        6 => {
+                            op._R(instruction.R, op.rem);
+                        },
+                        7 => {
+                            op._R(instruction.R, op.remu);
+                        },
                     }
                 },
-                6 => {
-                    op._R(instruction.R, op.or_);
+                0x20 => {
+                    switch (instruction.R.func3) {
+                        0 => {
+                            op._R(instruction.R, op.sub);
+                        },
+                        5 => {
+                            op._R(instruction.R, op.sra);
+                        },
+                        else => {},
+                    }
                 },
-                7 => {
-                    op._R(instruction.R, op.and_);
-                },
+                else => {},
             }
         },
         0x13 => {
-            switch (instruction.I.func3) {
-                0 => {
-                    op._I(instruction.I, op.add);
-                },
-                1 => {
-                    op._I(instruction.I, op.sll);
-                },
-                2 => {
-                    op._I(instruction.I, op.slt);
-                },
-                3 => {
-                    op._I(instruction.I, op.sltu);
-                },
-                4 => {
-                    op._I(instruction.I, op.xor);
-                },
-                5 => {
-                    if (instruction.R.func7 == 0x20) {
+            switch (instruction.R.func7) {
+                0x20 => {
+                    if (instruction.R.func3 == 5) {
                         op._I(instruction.I, op.sra);
-                    } else {
-                        op._I(instruction.I, op.srl);
                     }
                 },
-                6 => {
-                    op._I(instruction.I, op.or_);
+                0 => {
+                    switch (instruction.I.func3) {
+                        0 => {
+                            op._I(instruction.I, op.add);
+                        },
+                        1 => {
+                            op._I(instruction.I, op.sll);
+                        },
+                        2 => {
+                            op._I(instruction.I, op.slt);
+                        },
+                        3 => {
+                            op._I(instruction.I, op.sltu);
+                        },
+                        4 => {
+                            op._I(instruction.I, op.xor);
+                        },
+                        5 => {
+                            op._I(instruction.I, op.srl);
+                        },
+                        6 => {
+                            op._I(instruction.I, op.or_);
+                        },
+                        7 => {
+                            op._I(instruction.I, op.and_);
+                        },
+                    }
                 },
-                7 => {
-                    op._I(instruction.I, op.and_);
-                },
+                else => {},
             }
         },
         3 => {
@@ -149,6 +191,20 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
     }
     bus.regs[0] = 0; // force x0 à 0
 }
+
+// Instruction
+
+// Opération
+// MUL
+// Multiplication, partie basse
+// MULH
+// Multiplication signed × signed, partie haute
+// MULHU
+// Multiplication unsigned × unsigned, partie haute
+// MULHSU
+// Multiplication signed × unsigned, partie haute
+// MULW
+// Multiplication sur 32 bits (RV64 uniquement)
 
 pub fn fetch(instr_size: u8, debug: bool, input_mode: bool) !void {
     var compteur: u16 = 0;

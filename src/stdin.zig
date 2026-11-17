@@ -49,6 +49,9 @@ pub fn serve_the_world() !void {
     }
     const nb = @min(n, 4);
     for (0..nb) |i| {
-        _ = try uart.uart.host_write(buf[i]);
+        const x = uart.uart.host_write(buf[i]) ;
+        if (x == -1) {
+            std.debug.print("nothing to read", .{});
+        }
     }
 }

@@ -24,7 +24,9 @@ pub fn _load(instr: I) !void {
         0, 4 => 1,
         1, 5 => 2,
         2 => 4,
-        else => {return Err.BadByteNb;},
+        else => {
+            return Err.BadByteNb;
+        },
     };
     const addr = bus.regs[instr.rs1] +% instr.get_imm();
     const data: u32 = try bus.fetch_mem(addr, size);
@@ -122,6 +124,62 @@ pub fn _B(instr: B) bool {
         },
     }
     return false;
+}
+
+pub fn mul(a: u32, b: u32) u32 {
+    return @mulWithOverflow(a, b)[0];
+}
+
+pub fn mulh(a: u32, b: u32) u32 {
+    const ai: i32 = @bitCast(a);
+    const bi: i32 = @bitCast(b);
+    const product: i64 = std.math.mulWide(i32, ai, bi);
+    const res: u64 = @bitCast(product);
+    return @truncate(res >> 32);
+}
+
+pub fn mulhu(a: u32, b: u32) u32 {
+    const product: u64 = std.math.mulWide(u32, a, b);
+    return @truncate(product >> 32);
+}
+
+pub fn mulhsu(rs1: u32, rs2: u32) u32 {
+    const a: i32 = @bitCast(rs1);
+    const b: u32 = rs2;
+    const product = @as(i64, a) * @as(i64, b);
+    return @truncate(@as(u64, @bitCast(product)) >> 32);
+}
+
+pub fn div(a: u32, b: u32) u32 {
+    if (b == 0) {
+        return std.math.maxInt(u32);
+    }
+    const ai: i32 = @bitCast(a);
+    const bi: i32 = @bitCast(b);
+    return @bitCast(@divTrunc(ai, bi));
+}
+
+pub fn divu(a: u32, b: u32) u32 {
+    if (b == 0) {
+        return std.math.maxInt(u32);
+    }
+    return @divTrunc(a, b);
+}
+
+pub fn rem(a: u32, b: u32) u32 {
+    if (b == 0) {
+        return a;
+    }
+    const ai: i32 = @bitCast(a);
+    const bi: i32 = @bitCast(b);
+    return @bitCast(@mod(ai, bi));
+}
+
+pub fn remu(a: u32, b: u32) u32 {
+    if (b == 0) {
+        return a;
+    }
+    return @mod(a, b);
 }
 
 pub fn add(a: u32, b: u32) u32 {
