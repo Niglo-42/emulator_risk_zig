@@ -61,3 +61,5 @@ zig fetch --save git+https://github.com/raylib-zig/raylib-zig#devel
 pour lancer le duo fenetre + uart zig build run -Doptimize=ReleaseFast -- src/input/draw_pixels.elf
 
 ressource ring buffer atomique https://rigtorp.se/ringbuffer.cpp
+
+args attendu: file_name | file_path (.elf) |<can be in desorder from here> "debug" | "input_from_window" 

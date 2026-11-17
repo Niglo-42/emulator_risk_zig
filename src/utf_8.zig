@@ -1,12 +1,26 @@
 fn log2(unicode: u32) u5 {
-    var res: u5 = 0;
+    var res: u5 = 1;
+    if (unicode == 0) {
+        return res;
+    }
     while (unicode >> res > 0) {
         res += 1;
     }
     return res;
 }
 
+// const Err = error {Utf8RangeFault,};
+
 pub fn encode_utf8(data: i32, buf: *[4]u8) u3 {
+    // 0xD800
+    // Début de la plage des surrogate UTF-16
+    // 0xDFFF
+    // Fin de la plage des surrogate
+    // 0x110000
+    // Au-delà de la limite Unicode
+    if (data >= 0x110000 or (data >= 0xd800 and data <= 0xdfff)) {
+        return 0;
+    }
     const uni: u32 = @bitCast(data);
     const unicode: u21 = @truncate(uni);
     const bit_required: u5 = log2(uni);

@@ -115,17 +115,17 @@ pub fn store_mem(addr: u32, byte_size: u32, value: u32) !void {
         return Err.Byte_Size_Err;
     }
     const offset: u32, const mem: []u8, const t: kind = try get_addr(addr, byte_size);
-    if (t != kind.UART) {
-        for (0..byte_size) |i| {
-            const shift: u5 = @intCast(i * 8);
-            mem[offset + i] = @truncate(value >> shift);
-        }
-    } else {
+    if (t == kind.UART) {
         const offsetu3: u3 = @truncate(offset);
         var buf: [4]u8 = undefined;
         @memset(&buf, 0);
         const data: i32 = @bitCast(value);
         const n = utf8.encode_utf8(data, &buf);
-        uart.uart.setter(offsetu3, &buf[0..n]);
+        uart.uart.setter(offsetu3, buf[0..n]);
+    } else {
+        for (0..byte_size) |i| {
+            const shift: u5 = @intCast(i * 8);
+            mem[offset + i] = @truncate(value >> shift);
+        }
     }
 }
