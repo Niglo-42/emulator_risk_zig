@@ -96,41 +96,35 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
             }
         },
         0x13 => {
-            switch (instruction.R.func7) {
-                0x20 => {
-                    if (instruction.R.func3 == 5) {
-                        op._I(instruction.I, op.sra);
-                    }
-                },
+            switch (instruction.I.func3) {
                 0 => {
-                    switch (instruction.I.func3) {
-                        0 => {
-                            op._I(instruction.I, op.add);
-                        },
-                        1 => {
-                            op._I(instruction.I, op.sll);
-                        },
-                        2 => {
-                            op._I(instruction.I, op.slt);
-                        },
-                        3 => {
-                            op._I(instruction.I, op.sltu);
-                        },
-                        4 => {
-                            op._I(instruction.I, op.xor);
-                        },
-                        5 => {
-                            op._I(instruction.I, op.srl);
-                        },
-                        6 => {
-                            op._I(instruction.I, op.or_);
-                        },
-                        7 => {
-                            op._I(instruction.I, op.and_);
-                        },
-                    }
+                    op._I(instruction.I, op.add);
                 },
-                else => {},
+                1 => {
+                    op._I(instruction.I, op.sll);
+                },
+                2 => {
+                    op._I(instruction.I, op.slt);
+                },
+                3 => {
+                    op._I(instruction.I, op.sltu);
+                },
+                4 => {
+                    op._I(instruction.I, op.xor);
+                },
+                5 => {
+                    // if (instruction.R.func7 == 0x20) {
+                    //     op._I(instruction.I, op.sra);
+                    // } else {
+                    op._I(instruction.I, op.srl);
+                    // }
+                },
+                6 => {
+                    op._I(instruction.I, op.or_);
+                },
+                7 => {
+                    op._I(instruction.I, op.and_);
+                },
             }
         },
         3 => {
