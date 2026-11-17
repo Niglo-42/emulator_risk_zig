@@ -69,8 +69,12 @@ const Screen = struct {
                     const byte2read = utf8.encode_utf8(key, &buf);
                     for (buf[0..byte2read]) |byte| {
                         _ = try uart.uart.host_write(byte);
+                        const b = uart.uart.getter(0);
+                        if (b.? != 0) {
+                            uart.uart.setter(0, b.?);
+                        }
+                        
                     }
-                    uart.uart.setter(0, buf[0..byte2read + 1]);
                 }
             }
 
@@ -92,11 +96,11 @@ test "encoding utf8 little endian" {
     {
         const n = utf8.encode_utf8(0x00, &buf);
         try std.testing.expectEqual(@as(usize, 1), n);
-        try std.testing.expectEqualSlices(u8, &.{ 0x00 }, buf[0..n]);
+        try std.testing.expectEqualSlices(u8, &.{0x00}, buf[0..n]);
 
         const n2 = utf8.encode_utf8(0x7F, &buf);
         try std.testing.expectEqual(@as(usize, 1), n2);
-        try std.testing.expectEqualSlices(u8, &.{ 0x7F }, buf[0..n2]);
+        try std.testing.expectEqualSlices(u8, &.{0x7F}, buf[0..n2]);
     }
 
     // 2 bytes: 0x80 - 0x7FF

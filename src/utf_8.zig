@@ -32,17 +32,17 @@ pub fn encode_utf8(data: i32, buf: *[4]u8) u3 {
         8...11 => {
             const x: u6 = @truncate(unicode);
             const y: u5 = @truncate(unicode >> 6);
-            buf[0] = 0b10 << 6 | @as(u8, x);
-            buf[1] = 0b110 << 5 | @as(u8, y);
+            buf[1] = 0b10 << 6 | @as(u8, x);
+            buf[0] = 0b110 << 5 | @as(u8, y);
             return 2;
         },
         12...16 => {
             const x: u6 = @truncate(unicode);
             const y: u6 = @truncate(unicode >> 6);
             const z: u4 = @truncate(unicode >> 12);
-            buf[0] = 0b10 << 6 | @as(u8, x);
+            buf[2] = 0b10 << 6 | @as(u8, x);
             buf[1] = 0b10 << 6 | @as(u8, y);
-            buf[2] = 0b1110 << 4 | @as(u8, z);
+            buf[0] = 0b1110 << 4 | @as(u8, z);
             return 3;
         },
         17...21 => {
@@ -50,10 +50,10 @@ pub fn encode_utf8(data: i32, buf: *[4]u8) u3 {
             const y: u6 = @truncate(unicode >> 6);
             const z: u6 = @truncate(unicode >> 12);
             const w: u3 = @truncate(unicode >> 18);
-            buf[0] = 0b10 << 6 | @as(u8, x);
-            buf[1] = 0b10 << 6 | @as(u8, y);
-            buf[2] = 0b10 << 6 | @as(u8, z);
-            buf[3] = 0b11110 << 3 | @as(u8, w);
+            buf[3] = 0b10 << 6 | @as(u8, x);
+            buf[2] = 0b10 << 6 | @as(u8, y);
+            buf[1] = 0b10 << 6 | @as(u8, z);
+            buf[0] = 0b11110 << 3 | @as(u8, w);
             return 4;
         },
         else => {return 0;},

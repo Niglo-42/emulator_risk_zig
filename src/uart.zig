@@ -32,11 +32,8 @@ const ring_buffer = struct {
                 return self.guest_read();
             },
             5 => {
-                if (self.read_h.load(.monotonic) == self.write_h.load(.monotonic)) {
-                    return 0x60;
-                } else {
-                    return 0x61;
-                }
+                if (self.read_h.load(.monotonic) == self.write_h.load(.monotonic)) {return 0x60;}
+                else {return 0x61;}
             },
             else => {
                 return self.passiv_regs[offset];
@@ -44,18 +41,16 @@ const ring_buffer = struct {
         }
     }
 
-    pub fn setter(self: *ring_buffer, offset: u3, bytes: []const u8) void {
-        if (bytes.len == 0) {
-            return;
-        }
+    pub fn setter(self: *ring_buffer, offset: u3, byte: u8) void {
         // 0 -> write sur stdout, 5 -> push byte in data reg uart
         switch (offset) {
             0 => {
-                _ = std.os.linux.write(1, bytes.ptr, bytes.len);
+                const ptr: [*]const u8 = @ptrCast(&byte);
+                _ = std.os.linux.write(1, ptr, 1);
             },
             5 => {},
             else => {
-                self.passiv_regs[offset] = bytes[0];
+                self.passiv_regs[offset] = byte;
             },
         }
     }
@@ -64,7 +59,7 @@ const ring_buffer = struct {
         const w = self.write_h.load(.monotonic);
         const r = self.read_h.load(.acquire);
         const res: u8 = @truncate(CAP - (w - r));
-        if (res == 0) {
+        if ( res == 0) {
             return Err.WriteImpossible;
         }
         self.queue[w & (CAP - 1)] = val;
@@ -75,12 +70,10 @@ const ring_buffer = struct {
 
     // quand invité lit à uart offset 0 cela est comme une instruction
     // qui déclanche cette fonction. (pour simuler la vrai transaction)
-    pub fn guest_read(self: *ring_buffer) ?u8 {
+    pub fn guest_read(self: *ring_buffer) ?u8 { 
         const r = self.read_h.load(.monotonic);
         const w = self.write_h.load(.acquire);
-        if (w == r) {
-            return null;
-        }
+        if (w == r) {return null;}
         const res = self.queue[r & (CAP - 1)];
         self.read_h.store(r +% 1, .release);
         // if (self.read_h == self.write_h) {
