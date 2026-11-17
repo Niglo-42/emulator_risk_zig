@@ -69,11 +69,6 @@ const Screen = struct {
                     const byte2read = utf8.encode_utf8(key, &buf);
                     for (buf[0..byte2read]) |byte| {
                         _ = try uart.uart.host_write(byte);
-                        const b = uart.uart.getter(0);
-                        if (b.? != 0) {
-                            uart.uart.setter(0, b.?);
-                        }
-                        
                     }
                 }
             }

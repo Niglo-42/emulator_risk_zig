@@ -9,7 +9,7 @@ int main(void){
         if (uart[5] & 1) // 0x61
         {
             buf[i] = uart[0];
-            // *uart = buf[i];
+            *uart = buf[i];
         }
         if (buf[i] == 'q' || buf[i] == 'Q') {
             return 0;
