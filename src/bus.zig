@@ -12,11 +12,44 @@ const Err = error{
     UartBadOffset,
 };
 
-
 pub const privilege: u2 = 3;
 pub var regs: [32]u32 = @splat(0);
 pub const RAM_BASE = 0x80000000;
 pub var csr: [0x1000]u8 = @splat(0);
+// l'index d'un csr transporte des métadonnées
+// si bit 11 allumé alors c'est une const
+// bit 9 et 8 = (00: u, 01: s, 11:m) les privileges
+// u = user et m = machine
+
+// mvendorid 0xF11,
+// marchid 0xF12,
+// mimpid 0xF13 : 0, ce qui veut dire « non renseigné ».
+// mhartid 0xF14 : 0, puisque tu as un seul cœur.
+
+// commence à s'eloigner de bus donc faire un nouveau fichier csr
+// config (description de la machine):
+// misa 0x301 : l’architecture et les extensions présentes.
+// Bits 31:30 = 01 pour 32 bits.
+// Ensuite, un bit par lettre : A = bit 0, I = bit 8,
+//  M = bit 12, S = bit 18, U = bit 20.
+// Pour RV32IMA avec le mode U, ça donne 0x40101101.
+//  N’active le bit A que quand A sera vraiment implémentée.
+// Les écritures sont ignorées.
+// mstatus 0x300 : l’état global. En M + U,
+//  seuls trois champs existent :
+// MIE, bit 3 : interruptions autorisées globalement ;
+// MPIE, bit 7 : la valeur de MIE avant le trap ;
+// MPP, bits 12:11 : le privilège avant le trap.
+//  Seules les valeurs 00 et 11 sont légales ;
+//  si on écrit 01 ou 10, ramène à une valeur légale.
+// Tous les autres bits se lisent à 0 et ignorent
+//  les écritures : c’est un masque d’écriture.
+
+//TODO implémente les configs des 15 regs de csr
+// ajoute aussi les 4 regs de cycle puis test.
+// les instructions sont faites et branchées, et ça compile
+// git push fait, tu en es à 1h de travail, à ajouter à cette
+// deuxieme partie.
 
 pub const Perif = struct {
     debug: [0xf00]u8,
