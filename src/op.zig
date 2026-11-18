@@ -156,6 +156,9 @@ pub fn div(a: u32, b: u32) u32 {
     }
     const ai: i32 = @bitCast(a);
     const bi: i32 = @bitCast(b);
+    if (ai == std.math.minInt(i32) and bi == -1) {
+        return a;
+    }
     return @bitCast(@divTrunc(ai, bi));
 }
 
@@ -172,14 +175,17 @@ pub fn rem(a: u32, b: u32) u32 {
     }
     const ai: i32 = @bitCast(a);
     const bi: i32 = @bitCast(b);
-    return @bitCast(@mod(ai, bi));
+    if (ai == std.math.minInt(i32) and bi == -1) {
+        return 0;
+    }
+    return @bitCast(@rem(ai, bi));
 }
 
 pub fn remu(a: u32, b: u32) u32 {
     if (b == 0) {
         return a;
     }
-    return @mod(a, b);
+    return @rem(a, b);
 }
 
 pub fn add(a: u32, b: u32) u32 {
@@ -377,3 +383,24 @@ const J = packed struct(u32) {
         return @bitCast(imm);
     }
 };
+
+
+test "RISC-V signed division overflow" {
+    const min = @as(u32, 0x80000000);
+    const minus_one = @as(u32, 0xFFFFFFFF);
+
+    try std.testing.expectEqual(min, div(min, minus_one));
+    try std.testing.expectEqual(@as(u32, 0), rem(min, minus_one));
+}
+
+test "RISC-V division by zero" {
+    try std.testing.expectEqual(
+        std.math.maxInt(u32),
+        div(123, 0),
+    );
+
+    try std.testing.expectEqual(
+        @as(u32, 123),
+        rem(123, 0),
+    );
+}
