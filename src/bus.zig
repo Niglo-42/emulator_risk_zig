@@ -12,8 +12,11 @@ const Err = error{
     UartBadOffset,
 };
 
+
+pub const privilege: u2 = 3;
 pub var regs: [32]u32 = @splat(0);
 pub const RAM_BASE = 0x80000000;
+pub var csr: [0x1000]u8 = @splat(0);
 
 pub const Perif = struct {
     debug: [0xf00]u8,

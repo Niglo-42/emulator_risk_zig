@@ -55,12 +55,12 @@ const ring_buffer = struct {
         }
     }
 
-    pub fn host_write(self: *ring_buffer, val: u8) i8 {
+    pub fn host_write(self: *ring_buffer, val: u8, largeur: u3) !i8 {
         const w = self.write_h.load(.monotonic);
         const r = self.read_h.load(.acquire);
         const res: u8 = @truncate(CAP - (w - r));
-        if ( res == 0) {
-            return -1;
+        if ( res < largeur) {
+            return Err.WriteImpossible;
         }
         self.queue[w & (CAP - 1)] = val;
         self.write_h.store(w +% 1, .release);

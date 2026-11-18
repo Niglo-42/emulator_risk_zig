@@ -47,11 +47,11 @@ pub fn serve_the_world() !void {
     if (n > 4) {
         return Err.Fail2Read;
     }
-    const nb = @min(n, 4);
+    const nb: u3 = @min(n, 4);
     for (0..nb) |i| {
-        const x = uart.uart.host_write(buf[i]) ;
+        const x = uart.uart.host_write(buf[i], nb) catch -1;
         if (x == -1) {
-            std.debug.print("nothing to read", .{});
+            std.debug.print("queue full", .{});
         }
     }
 }

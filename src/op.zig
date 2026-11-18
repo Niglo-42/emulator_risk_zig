@@ -4,6 +4,8 @@ const fetch = @import("fetch_and_decode.zig");
 
 const Err = error{
     BadByteNb,
+    ReadConst,
+    NeedMorePrivilege,
 };
 
 pub fn _R(instr: R, f: fn (u32, u32) u32) void {
@@ -43,6 +45,84 @@ pub fn _load(instr: I) !void {
             }
         }
     }
+}
+
+fn csr(instr: I, varianteI: bool) !struct {u32, u32} {
+    const src_val: u32 = bus.regs[instr.rs1];
+    var idx: u32 = 0;
+    if (varianteI) {
+        idx = instr.rs1;
+    } else {
+        idx = instr.get_imm();
+    }
+    const droits: u4 = @truncate(idx >> 8);
+    const required_privilege: u2 = @truncate(droits);
+
+    if (droits & 0b1000 == 0b1000) {
+        std.debug.print("lecture seule !", .{});
+        return Err.ReadConst;
+    }
+    if (required_privilege > bus.privilege) {
+        std.debug.print("you need more privilege", .{});
+        return Err.NeedMorePrivilege;
+    }
+    return .{idx, src_val};
+}
+
+pub fn csrrw(instr: I) !void {
+    const idx, const src_val = try csr(instr, false);
+    if (instr.rd != 0) {
+        bus.regs[instr.rd] = bus.csr[idx];
+    }
+    bus.csr[idx] = @truncate(bus.regs[src_val]);
+}
+
+pub fn csrrwi(instr: I) !void {
+    const idx, const src_val = try csr(instr, true);
+    if (instr.rd != 0) {
+        bus.regs[instr.rd] = bus.csr[idx];
+    }
+    bus.csr[idx] = @truncate(bus.regs[src_val]);
+}
+
+pub fn csrrs(instr: I) !void {
+    if (instr.rd == 0 or instr.rs1 == 0) {
+        return ;
+    }
+    const idx, const src_val = try csr(instr, false);
+    bus.regs[instr.rd] = bus.csr[idx];
+    const reg_val: u8 =  @truncate(bus.regs[src_val]);
+    bus.csr[idx] = bus.csr[idx] |  reg_val;
+}
+
+pub fn csrrsi(instr: I) !void {
+    if (instr.rd == 0 or instr.rs1 == 0) {
+        return ;
+    }
+    const idx, const src_val = try csr(instr, true);
+    bus.regs[instr.rd] = bus.csr[idx];
+    const reg_val: u8 =  @truncate(bus.regs[src_val]);
+    bus.csr[idx] = bus.csr[idx] |  reg_val;
+}
+
+pub fn csrrc(instr: I) !void {
+    if (instr.rd == 0 or instr.rs1 == 0) {
+        return ;
+    }
+    const idx, const src_val = try csr(instr, false);
+    bus.regs[instr.rd] = bus.csr[idx];
+    const reg_val: u8 =  @truncate(bus.regs[src_val]);
+    bus.csr[idx] = bus.csr[idx] & ~(reg_val);
+}
+
+pub fn csrrci(instr: I) !void {
+    if (instr.rd == 0 or instr.rs1 == 0) {
+        return ;
+    }
+    const idx, const src_val = try csr(instr, true);
+    bus.regs[instr.rd] = bus.csr[idx];
+    const reg_val: u8 =  @truncate(bus.regs[src_val]);
+    bus.csr[idx] = bus.csr[idx] & ~(reg_val);
 }
 
 pub fn jal(instr: J) void {

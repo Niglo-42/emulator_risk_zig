@@ -154,18 +154,44 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
         0x73 => {
             // system
             //ecall = 0x73 pure
-            if (instruction.I.func3 == 0) {
-                if (instruction.I.get_imm() == 0) {
-                    if (bus.regs[17] == 93) {
-                        run.* = false;
+            switch (instruction.I.func3) 
+            {
+                0 => 
+                {
+                    if (bus.regs[17] == 93) { // pour garantir le defer
+                        run.* = false;          // dans main
                         return;
                     }
                     try sys.syscall();
-                } else if (instruction.I.imm == 1) {
-                    //ebreak 0x00100073
-                }
-            } else {
-                return Err.Decode;
+                },
+                1 => 
+                {
+                    try op.csrrw(instruction.I);
+                },
+                2 => 
+                {
+                    try op.csrrs(instruction.I);
+                },
+                3 => 
+                {
+                    try op.csrrc(instruction.I);
+                },
+                4 => 
+                {
+                    std.debug.print("illégal", .{});
+                },
+                5 => 
+                {
+                    try op.csrrwi(instruction.I);
+                },
+                6 => 
+                {
+                    try op.csrrsi(instruction.I);
+                },
+                7 => 
+                {
+                    try op.csrrci(instruction.I);
+                },
             }
         },
         0xf => {

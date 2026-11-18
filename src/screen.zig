@@ -68,9 +68,9 @@ const Screen = struct {
                     @memset(&buf, 0);
                     const byte2read = utf8.encode_utf8(key, &buf);
                     for (buf[0..byte2read]) |byte| {
-                        const x = uart.uart.host_write(byte) ;
+                        const x = uart.uart.host_write(byte, byte2read) catch -1;
                         if (x == -1) {
-                            std.debug.print("nothing to read", .{});
+                            std.debug.print("queue is full", .{});
                         }
                     }
                 }
