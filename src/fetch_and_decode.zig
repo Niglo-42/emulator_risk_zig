@@ -7,6 +7,7 @@ const main = @import("main.zig");
 const std = @import("std");
 const time = std.time;
 const INSTRUCTION = op.INSTRUCTION;
+const csr = @import("csr.zig");
 pub var pc: u32 = 0;
 
 const Err = error{
@@ -166,15 +167,15 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
                 },
                 1 => 
                 {
-                    try op.csrrw(instruction.I);
+                    try csr.csrrw(instruction.I);
                 },
                 2 => 
                 {
-                    try op.csrrs(instruction.I);
+                    try csr.csrrs(instruction.I);
                 },
                 3 => 
                 {
-                    try op.csrrc(instruction.I);
+                    try csr.csrrc(instruction.I);
                 },
                 4 => 
                 {
@@ -182,15 +183,15 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
                 },
                 5 => 
                 {
-                    try op.csrrwi(instruction.I);
+                    try csr.csrrwi(instruction.I);
                 },
                 6 => 
                 {
-                    try op.csrrsi(instruction.I);
+                    try csr.csrrsi(instruction.I);
                 },
                 7 => 
                 {
-                    try op.csrrci(instruction.I);
+                    try csr.csrrci(instruction.I);
                 },
             }
         },
