@@ -1,4 +1,3 @@
-const sys = @import("syscall.zig");
 const bus = @import("bus.zig");
 const dbg = @import("dbg.zig");
 const op = @import("op.zig");
@@ -8,6 +7,7 @@ const std = @import("std");
 const time = std.time;
 const INSTRUCTION = op.INSTRUCTION;
 const csr = @import("csr.zig");
+const trap = @import("trap.zig");
 pub var pc: u32 = 0;
 
 const Err = error{
@@ -16,7 +16,7 @@ const Err = error{
     InvalidFunc3,
 };
 
-fn decode(instr: u32, debug: bool, run: *bool) !void {
+fn decode(instr: u32, debug: bool) !void {
     const instruction: INSTRUCTION = @bitCast(instr);
     if (debug) {
         dbg.disassembly(instruction);
@@ -91,14 +91,14 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
                             op._R(instruction.R, op.sra);
                         },
                         else => {
-                            return Err.UnknownInstruction;
+                            return trap.Fault.IllegalInstruction;
                         },
                     }
                 },
                 else => {
                     // avant : ignoré en silence -> une instruction inconnue
                     // devenait un "nop" invisible
-                    return Err.UnknownInstruction;
+                    return trap.Fault.IllegalInstruction;
                 },
             }
         },
@@ -110,7 +110,7 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
                 1 => {
                     // slli : les bits 31:25 doivent valoir 0 en RV32
                     if (instruction.R.func7 != 0) {
-                        return Err.UnknownInstruction;
+                        return trap.Fault.IllegalInstruction;
                     }
                     op._I(instruction.I, op.sll);
                 },
@@ -134,7 +134,7 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
                     } else if (instruction.R.func7 == 0) {
                         op._I(instruction.I, op.srl);
                     } else {
-                        return Err.UnknownInstruction;
+                        return trap.Fault.IllegalInstruction;
                     }
                 },
                 6 => {
@@ -149,11 +149,8 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
             try op._load(instruction.I);
         },
         0x63 => {
-            //B : funct3 2 et 3 n'existent pas
-            if (instruction.B.func3 == 2 or instruction.B.func3 == 3) {
-                return Err.UnknownInstruction;
-            }
-            flag = op._B(instruction.B);
+            //B : funct3 2 et 3 n'existent pas (op._B renvoie une faute)
+            flag = try op._B(instruction.B);
         },
         0x23 => {
             try op._S(instruction.S);
@@ -165,12 +162,15 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
             op.auipc(instruction.U);
         },
         0x6f => {
+            try op.jal(instruction.J);
             flag = true;
-            op.jal(instruction.J);
         },
         0x67 => {
+            if (instruction.I.func3 != 0) {
+                return trap.Fault.IllegalInstruction;
+            }
+            try op.jalr(instruction.I);
             flag = true;
-            op.jalr(instruction.I);
         },
         0x73 => {
             // system
@@ -179,11 +179,30 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
             {
                 0 => 
                 {
-                    if (bus.regs[17] == 93) { // pour garantir le defer
-                        run.* = false;          // dans main
-                        return;
+                    // funct3 = 0 : instructions privilégiées, reconnues à
+                    // leur champ imm (bits 31:20), avec rs1 = rd = 0.
+                    // ecall n'appelle plus l'hôte : c'est une exception,
+                    // gérée par le handler du guest (son kernel).
+                    if (instruction.I.rs1 != 0 or instruction.I.rd != 0) {
+                        return trap.Fault.IllegalInstruction;
                     }
-                    try sys.syscall();
+                    switch (instruction.I.imm) {
+                        0x000 => return trap.Fault.Ecall,
+                        0x001 => return trap.Fault.Breakpoint,
+                        0x302 => {
+                            // mret écrit lui-même le pc : comme un saut
+                            try trap.mret();
+                            flag = true;
+                        },
+                        0x105 => {
+                            // wfi : "attends une interruption". Pour l'instant
+                            // un nop en mode M (bloc 3 : vraie attente).
+                            if (csr.privilege != csr.MACHINE) {
+                                return trap.Fault.IllegalInstruction;
+                            }
+                        },
+                        else => return trap.Fault.IllegalInstruction,
+                    }
                 },
                 1 =>
                 {
@@ -200,7 +219,7 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
                 4 =>
                 {
                     // funct3 100 est réservé : instruction illégale
-                    return Err.UnknownInstruction;
+                    return trap.Fault.IllegalInstruction;
                 },
                 5 =>
                 {
@@ -217,6 +236,11 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
             }
         },
         0xf => {
+            // fence (funct3 0) et fence.i (funct3 1) : rien à faire chez
+            // nous (un seul cœur, pas de cache). Le reste est illégal.
+            if (instruction.I.func3 > 1) {
+                return trap.Fault.IllegalInstruction;
+            }
             //FENCE (opcode 0x0F, funct3 = 0)
             //Ses champs sont fm (bits 31:28),
             //pred (27:24) et succ (23:20).
@@ -225,7 +249,7 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
             //avec I = bit 3 et W = bit 0
         },
         else => {
-            return Err.UnknownInstruction;
+            return trap.Fault.IllegalInstruction;
         },
     }
     if (flag == false) {
@@ -248,14 +272,81 @@ fn decode(instr: u32, debug: bool, run: *bool) !void {
 // MULW
 // Multiplication sur 32 bits (RV64 uniquement)
 
+// Transforme une erreur remontée par decode en trap pour le guest.
+// Toute erreur qui n'est PAS une faute du guest est un bug de l'émulateur :
+// on la laisse remonter et l'émulateur s'arrête.
+fn handle_fault(err: anyerror, instr: u32, debug: bool) !void {
+    switch (err) {
+        error.IllegalInstruction => {
+            // mtval = les 32 bits de l'instruction illégale
+            try raise(trap.CAUSE_ILLEGAL_INSTRUCTION, instr, debug);
+        },
+        error.InstructionMisaligned => {
+            try raise(trap.CAUSE_INSTRUCTION_MISALIGNED, trap.pending_tval, debug);
+        },
+        error.LoadAccessFault => {
+            try raise(trap.CAUSE_LOAD_ACCESS_FAULT, trap.pending_tval, debug);
+        },
+        error.StoreAccessFault => {
+            try raise(trap.CAUSE_STORE_ACCESS_FAULT, trap.pending_tval, debug);
+        },
+        error.Ecall => {
+            // la cause dépend de QUI fait l'appel
+            if (csr.privilege == csr.USER) {
+                try raise(trap.CAUSE_ECALL_FROM_U, 0, debug);
+            } else {
+                try raise(trap.CAUSE_ECALL_FROM_M, 0, debug);
+            }
+        },
+        error.Breakpoint => {
+            // mtval = l'adresse de l'ebreak
+            try raise(trap.CAUSE_BREAKPOINT, pc, debug);
+        },
+        else => {
+            std.debug.print("bug de l'émulateur : {s} à pc=0x{x:0>8}, instruction=0x{x:0>8}\n", .{ @errorName(err), pc, instr });
+            if (debug) {
+                dbg.print_regs();
+            }
+            return err;
+        },
+    }
+}
+
+// Filet de sécurité : si le guest n'a jamais installé de handler
+// (mtvec == 0, et l'adresse 0 n'est pas de la RAM chez nous), sauter à 0
+// ferait boucler l'émulateur sur des fautes à l'infini. On s'arrête en
+// expliquant pourquoi. C'est le cas des petits programmes C sans handler.
+fn raise(cause: u32, tval: u32, debug: bool) !void {
+    if (debug) {
+        std.debug.print("trap : mcause={d}, pc=0x{x:0>8}, mtval=0x{x:0>8}\n", .{ cause, pc, tval });
+        if (cause == trap.CAUSE_ILLEGAL_INSTRUCTION and csr.last_illegal_reason.len > 0) {
+            std.debug.print("       CSR 0x{x:0>3} : {s}\n", .{ csr.last_illegal_csr, csr.last_illegal_reason });
+        }
+    }
+    csr.last_illegal_reason = "";
+    if (csr.read(.mtvec) == 0) {
+        std.debug.print("trap sans handler (mtvec = 0) : mcause={d}, pc=0x{x:0>8}, mtval=0x{x:0>8}\n", .{ cause, pc, tval });
+        if (debug) {
+            dbg.print_regs();
+        }
+        return error.NoTrapHandler;
+    }
+    trap.take_trap(cause, tval);
+}
+
+// mis à true si le CPU s'arrête sur une erreur (bug de l'émulateur, ou
+// trap sans handler) : main sort alors avec le code 2
+pub var crashed = false;
+
 pub fn fetch(instr_size: u8, debug: bool, input_mode: bool) !void {
     // Quoi qu'il arrive (fin normale OU erreur), on prévient la fenêtre et
     // main que le CPU s'est arrêté. Sans ce defer, une erreur dans ce thread
     // le termine en silence et la fenêtre reste ouverte.
     defer main.flag.store(true, .monotonic);
+    errdefer crashed = true;
     var compteur: u16 = 0;
-    var run = true;
-    while (run) {
+
+    while (true) {
         if (compteur == 0) {
             if (input_mode == false) {
                 try stdin.serve_the_world();
@@ -266,18 +357,27 @@ pub fn fetch(instr_size: u8, debug: bool, input_mode: bool) !void {
         if (main.flag.load(.monotonic) == true) {
             break;
         }
-        const instr = try bus.fetch_mem(pc, instr_size);
-        decode(instr, debug, &run) catch |err| {
-            std.debug.print("arrêt sur erreur {s} à pc=0x{x:0>8}, instruction=0x{x:0>8}\n", .{ @errorName(err), pc, instr });
-            if (debug) {
-                dbg.print_regs();
-            }
-            return err;
-        };
-        // une instruction de plus retirée (et 1 instruction = 1 cycle ici)
-        csr.instret_counter +%= 1;
+        // 1 instruction = 1 cycle, qu'elle aboutisse ou qu'elle trappe
         csr.cycle_counter +%= 1;
         compteur = compteur +% 1;
+
+        // fetch : une adresse hors du bus est une faute d'accès instruction
+        const instr = bus.fetch_mem(pc, instr_size) catch {
+            try raise(trap.CAUSE_INSTRUCTION_ACCESS_FAULT, pc, debug);
+            continue;
+        };
+        decode(instr, debug) catch |err| {
+            try handle_fault(err, instr, debug);
+            // instruction non retirée : pas d'incrément de instret
+            continue;
+        };
+        // une instruction de plus retirée (sauf si elle vient d'écrire
+        // minstret elle-même : voir csr.instret_written)
+        if (csr.instret_written) {
+            csr.instret_written = false;
+        } else {
+            csr.instret_counter +%= 1;
+        }
     }
     if (debug) {
         dbg.print_regs();

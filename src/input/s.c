@@ -3,19 +3,15 @@
 
 
 
+// Avant : un ecall 64 (write) traduit vers l'hôte. Depuis les traps, un
+// ecall saute au handler du guest, et ce programme n'en a pas : on écrit
+// donc directement dans l'UART, octet par octet.
 static void write(const char *s, int len)
 {
-    register int a0 asm("a0") = 1;
-    register int a7 asm("a7") = 64;
-    register const char *a1 asm("a1") = s;
-    register int a2 asm("a2") = len;
+    volatile char *uart = (volatile char *)0x10000000;
 
-    asm volatile (
-        "ecall"
-        : "+r"(a0)
-        : "r"(a1), "r"(a2)
-        : "memory"
-    );
+    for (int i = 0; i < len; i++)
+        *uart = s[i];
 }
 
 static void clear_screen(void)

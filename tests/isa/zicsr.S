@@ -36,8 +36,9 @@ RVTEST_CODE_BEGIN
   TEST_CASE( 14, a0, 0x80000000, li t0, 0x80000003; csrw mepc, t0; csrr a0, mepc );
   # mcycle est inscriptible, et continue à compter après
   TEST_CASE( 15, a0, 1, li t0, 1000; csrw mcycle, t0; csrr a1, mcycle; sub a1, a1, t0; sltiu a0, a1, 10 );
-  # mtvec : mode forcé à 0 (direct)
-  TEST_CASE( 16, a0, 0x80000100, li t0, 0x80000101; csrw mtvec, t0; csrr a0, mtvec );
+  # mtvec : mode forcé à 0 (direct). On restaure mtvec après : avec ENV=p,
+  # c'est l'adresse du trap_vector de l'environnement (PASS/FAIL passent par là)
+  TEST_CASE( 16, a0, 0x80000100, csrr t1, mtvec; li t0, 0x80000101; csrw mtvec, t0; csrr a0, mtvec; csrw mtvec, t1 );
   # pmp : accepté, se relit à 0 (0 entrée implémentée)
   TEST_CASE( 17, a0, 0, li t0, -1; csrw pmpaddr0, t0; csrr a0, pmpaddr0 );
 

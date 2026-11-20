@@ -1,3 +1,7 @@
+// PLUS UTILISÉ depuis l'arrivée des traps : un ecall est maintenant une
+// exception traitée par le handler du guest (son kernel), et non plus un
+// appel système traduit vers l'hôte. Gardé pour mémoire, supprimable.
+
 const std = @import("std");
 const print = std.debug.print;
 const bus = @import("bus.zig");

@@ -6,7 +6,8 @@
 //   PASS -> 0x5555
 //   FAIL -> 0x3333 | (numéro du test raté << 16)
 //
-// Étape suivante (traps) : on ajoutera ici un trap_vector pour les tests rv32mi.
+// Utilisé tant que les traps ne marchent pas. Ensuite, préfère ENV=p (voir
+// tests/env/p), qui fait tourner les tests rv32ui en mode U.
 
 #ifndef _ENV_EMU_H
 #define _ENV_EMU_H

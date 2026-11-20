@@ -29,6 +29,12 @@ pub var privilege: u2 = MACHINE;
 pub var cycle_counter: u64 = 0;
 pub var instret_counter: u64 = 0;
 
+// Règle de la spec : quand une instruction ÉCRIT minstret (ou minstreth),
+// la valeur écrite est celle que lira l'instruction suivante. La boucle
+// fetch ne doit donc pas faire +1 pour cette instruction-là.
+// (test riscv-tests rv32mi/instret_overflow)
+pub var instret_written = false;
+
 // Stockage des CSR qui sont de "simples registres" (mstatus, mepc, ...).
 // Indexé par le numéro du CSR.
 var storage: [0x1000]u32 = @splat(0);
@@ -150,9 +156,11 @@ fn write(reg: Config, value: u32) void {
         },
         .minstret => {
             instret_counter = (instret_counter & 0xffffffff_00000000) | @as(u64, value);
+            instret_written = true;
         },
         .minstreth => {
             instret_counter = (instret_counter & 0x00000000_ffffffff) | (@as(u64, value) << 32);
+            instret_written = true;
         },
         else => {
             const idx = @intFromEnum(reg);
@@ -179,8 +187,15 @@ pub fn set_raw(reg: Config, value: u32) void {
     storage[@intFromEnum(reg)] = value;
 }
 
+// Raison de la dernière instruction CSR illégale, affichée par la boucle
+// fetch en mode debug. On n'affiche rien sinon : un OS "sonde" souvent des
+// CSR optionnels en provoquant exprès une instruction illégale.
+pub var last_illegal_reason: []const u8 = "";
+pub var last_illegal_csr: u12 = 0;
+
 fn illegal(reason: []const u8, csr_number: u12) Err {
-    std.debug.print("instruction illégale (CSR 0x{x:0>3}) : {s}\n", .{ csr_number, reason });
+    last_illegal_reason = reason;
+    last_illegal_csr = csr_number;
     return Err.IllegalInstruction;
 }
 

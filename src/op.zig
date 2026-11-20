@@ -2,6 +2,7 @@ const std = @import("std");
 const bus = @import("bus.zig");
 const fetch = @import("fetch_and_decode.zig");
 const csr_ = @import("csr.zig");
+const trap = @import("trap.zig");
 const Err = error{
     BadByteNb,
     ReadConst,
@@ -28,11 +29,16 @@ pub fn _load(instr: I) !void {
         1, 5 => 2,
         2 => 4,
         else => {
-            return Err.BadByteNb;
+            return trap.Fault.IllegalInstruction;
         },
     };
     const addr = bus.regs[instr.rs1] +% instr.get_imm();
-    const data: u32 = try bus.fetch_mem(addr, size);
+    // une adresse hors du bus n'arrête plus l'émulateur : c'est une faute
+    // de lecture pour le guest, avec l'adresse fautive dans mtval
+    const data: u32 = bus.fetch_mem(addr, size) catch {
+        trap.pending_tval = addr;
+        return trap.Fault.LoadAccessFault;
+    };
     const neg: u5 = @truncate(size * 8 - 1);
     if (instr.rd != 0) {
         if (instr.func3 > 1) // si unsigned
@@ -48,19 +54,33 @@ pub fn _load(instr: I) !void {
     }
 }
 
-pub fn jal(instr: J) void {
-    if (instr.rd != 0) {
-        bus.regs[instr.rd] = fetch.pc + 4;
+// Sans l'extension C, une instruction est toujours à une adresse multiple
+// de 4. Un saut vers une autre adresse est une faute sur le SAUT lui-même :
+// rd et pc ne changent pas, la cible va dans mtval.
+fn check_jump_target(target: u32) trap.Fault!void {
+    if (target & 3 != 0) {
+        trap.pending_tval = target;
+        return trap.Fault.InstructionMisaligned;
     }
-    fetch.pc = fetch.pc +% instr.get_imm();
 }
 
-pub fn jalr(instr: I) void {
-    const ra: u32 = fetch.pc + 4;
-    fetch.pc = (bus.regs[instr.rs1] +% instr.get_imm()) & 0xfffffffe;
+pub fn jal(instr: J) trap.Fault!void {
+    const target = fetch.pc +% instr.get_imm();
+    try check_jump_target(target);
     if (instr.rd != 0) {
-        bus.regs[instr.rd] = ra;
+        bus.regs[instr.rd] = fetch.pc +% 4;
     }
+    fetch.pc = target;
+}
+
+pub fn jalr(instr: I) trap.Fault!void {
+    // rs1 est lu AVANT d'écrire rd (rd peut être == rs1)
+    const target = (bus.regs[instr.rs1] +% instr.get_imm()) & 0xfffffffe;
+    try check_jump_target(target);
+    if (instr.rd != 0) {
+        bus.regs[instr.rd] = fetch.pc +% 4;
+    }
+    fetch.pc = target;
 }
 
 pub fn lui(instr: U) void {
@@ -76,57 +96,61 @@ pub fn _S(instr: S) !void {
         0 => 1, // SB
         1 => 2, // SH
         2 => 4, // SW
-        else => return Err.BadByteNb, // avant : ignoré en silence
+        else => return trap.Fault.IllegalInstruction, // avant : ignoré en silence
     };
 
     const addr = bus.regs[instr.rs1] +% instr.get_imm();
     const value = bus.regs[instr.rs2];
-    try bus.store_mem(addr, size, value);
+    bus.store_mem(addr, size, value) catch {
+        trap.pending_tval = addr;
+        return trap.Fault.StoreAccessFault;
+    };
 }
 
-pub fn _B(instr: B) bool {
+// Renvoie true si le branchement est pris (le pc a déjà été mis à jour).
+pub fn _B(instr: B) trap.Fault!bool {
+    var taken = false;
     switch (instr.func3) {
         0 => { // beq
             if (@as(i32, @bitCast(bus.regs[instr.rs1])) == @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                fetch.pc = fetch.pc +% instr.get_imm();
-                return true;
+                taken = true;
             }
         },
         1 => { // bne
             if (@as(i32, @bitCast(bus.regs[instr.rs1])) != @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                fetch.pc = fetch.pc +% instr.get_imm();
-                return true;
+                taken = true;
             }
         },
         4 => { //blt
             if (@as(i32, @bitCast(bus.regs[instr.rs1])) < @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                fetch.pc = fetch.pc +% instr.get_imm();
-                return true;
+                taken = true;
             }
         },
         5 => { //bge
             if (@as(i32, @bitCast(bus.regs[instr.rs1])) >= @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                fetch.pc = fetch.pc +% instr.get_imm();
-                return true;
+                taken = true;
             }
         },
         6 => { //bltu
             if (bus.regs[instr.rs1] < bus.regs[instr.rs2]) {
-                fetch.pc = fetch.pc +% instr.get_imm();
-                return true;
+                taken = true;
             }
         },
         7 => { //bgeu
             if (bus.regs[instr.rs1] >= bus.regs[instr.rs2]) {
-                fetch.pc = fetch.pc +% instr.get_imm();
-                return true;
+                taken = true;
             }
         },
         else => {
-            return false;
+            return trap.Fault.IllegalInstruction;
         },
     }
-    return false;
+    if (taken) {
+        const target = fetch.pc +% instr.get_imm();
+        try check_jump_target(target);
+        fetch.pc = target;
+    }
+    return taken;
 }
 
 pub fn mul(a: u32, b: u32) u32 {

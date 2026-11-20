@@ -3,6 +3,20 @@ https://docs.riscv.org/reference/isa/_attachments/riscv-unprivileged.pdf
 
 https://msyksphinz-self.github.io/riscv-isadoc/#_lbu
 
+## Tests (riscv-tests)
+
+    zig build
+    tests/run_isa_tests.sh            # rv32ui + rv32um + tests maison, sans traps
+    tests/run_isa_tests.sh rv32mi     # mode machine : a besoin des traps
+    ENV=p tests/run_isa_tests.sh      # tout avec l'environnement officiel (mode U)
+
+Le premier lancement clone riscv-tests dans tests/riscv-tests.
+Un échec affiche le numéro du cas raté : cherche `TEST_CASE( n,` dans le .S.
+
+Fin d'un programme invité : écrire 0x5555 (succès) ou 0x3333 | (code << 16)
+à 0x100000 (voir src/finisher.zig et src/input/start.s).
+
+
 pour compiler le c: 
 riscv64-unknown-elf-gcc     -march=rv32im -mabi=ilp32     -ffreestanding -fno-builtin     -fno-pic -fno-pie     -nostdlib -nostartfiles     -Wl,-T,link.ld     -Wl,--no-relax     -O0     start.s <file_name>.c     -o <file_name>.elf
 

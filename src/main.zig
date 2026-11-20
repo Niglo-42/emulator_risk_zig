@@ -64,6 +64,11 @@ pub fn main(init: std.process.Init) !void {
     }
     thread.join();
 
+    // Le CPU s'est arrêté sur une erreur : code de sortie 2.
+    if (launch.crashed) {
+        stdin.disableRawMode(orig_termios);
+        std.process.exit(2);
+    }
     // Si le guest a demandé l'arrêt via le finisher, on sort avec son code.
     // std.process.exit ne lance pas les defer : on restaure le terminal avant.
     if (finisher.exit_code) |code| {
