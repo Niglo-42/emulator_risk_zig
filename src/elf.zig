@@ -129,7 +129,10 @@ pub fn parse_elf(buffer: []u8) ![]struct { u32, u32 } {
             "wrong_phnum",
         );
     }
-    var res: [0x1000]struct { u32, u32 } = undefined;
+    // `report` est une variable globale (voir plus bas) : avant, c'était un
+    // tableau local et on renvoyait un slice qui pointait dans la pile de
+    // parse_elf, donc vers de la mémoire déjà libérée au retour.
+    var loaded: usize = 0;
     for (0..e_phnum) |i| {
         const p_h = prog_header.init(buffer[e_phoff + i * e_phentsize ..][0..32]);
         if (p_h.p_type != 1) {
@@ -165,11 +168,19 @@ pub fn parse_elf(buffer: []u8) ![]struct { u32, u32 } {
         const dest = p_h.p_paddr - bus.RAM_BASE;
         @memcpy(bus.perif.ram[dest .. dest + p_h.p_filesz], buffer[p_h.p_offset .. p_h.p_offset + p_h.p_filesz]);
         @memset(bus.perif.ram[dest + p_h.p_filesz .. dest + p_h.p_memsz], 0);
-        res[i] = .{ p_h.p_filesz - dest, p_h.p_memsz - dest };
+        // avant : `p_filesz - dest` débordait (panic en Debug) dès qu'un
+        // segment n'était pas chargé au tout début de la RAM
+        if (loaded < report.len) {
+            report[loaded] = .{ p_h.p_filesz, p_h.p_memsz };
+            loaded += 1;
+        }
         // todo verif si entry est dedans
     }
-    return res[0..e_phnum];
+    return report[0..loaded];
 }
+
+// tailles (fichier, mémoire) de chaque segment chargé, pour le mode debug
+var report: [64]struct { u32, u32 } = undefined;
 
 const prog_header = struct {
     p_type: u32,

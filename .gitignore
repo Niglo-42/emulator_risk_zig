@@ -2,3 +2,6 @@
 zig-out
 zig-pkg
 .zig-pkg
+# riscv-tests (cloné par tests/run_isa_tests.sh) et binaires de test
+tests/riscv-tests
+tests/build/

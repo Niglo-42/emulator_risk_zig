@@ -5,16 +5,19 @@ const sys = @import("syscall.zig");
 const uart = @import("uart.zig");
 const screen = @import("screen.zig");
 const utf8 = @import("utf_8.zig");
+const finisher = @import("finisher.zig");
 const Err = error{
     Byte_Size_Err,
     BadAdress,
     UartBadByteSize,
     UartBadOffset,
+    FinisherBadAccess,
 };
 
 
 pub var regs: [32]u32 = @splat(0);
 pub const RAM_BASE = 0x80000000;
+pub const SCREEN_BASE = 0x40000000;
 
 
 pub const Perif = struct {
@@ -48,6 +51,7 @@ pub const kind = enum {
     UART,
     RAM,
     SCREEN,
+    FINISHER,
 };
 
 pub fn array2u32(buf: [4]u8) u32 {
@@ -68,7 +72,8 @@ pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8, kind } {
     // si uart alors check flux == 1  byte
     switch (addr) {
         0x100...0xfff => {},
-        0x1000...0x1000fff => {},
+        0x100000...0x100fff => {},
+        0x40000000...0x40ffffff => {},
         0x10000000...0x10000007 => {},
         0x80000000...0x800fffff => {},
         else => {
@@ -77,7 +82,11 @@ pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8, kind } {
     }
     const base: u32, const mem: []u8, const t: kind = switch (addr + byte_nb - 1) {
         0x100...0xfff => .{ 0x100, perif.debug[0..], kind.DEBUG },
-        0x1000...0x1000fff => .{ 0x1000, screen.screen.view[0..], kind.SCREEN },
+        // framebuffer de 16 Mo, déplacé de 0x1000 à 0x40000000 : à 0x1000 il
+        // recouvrait toute la zone basse (finisher à 0x100000, CLINT à 0x2000000)
+        0x40000000...0x40ffffff => .{ SCREEN_BASE, screen.screen.view[0..], kind.SCREEN },
+        // le finisher n'a pas de mémoire à lui : on passe un slice vide
+        0x100000...0x100fff => .{ finisher.BASE, &[_]u8{}, kind.FINISHER },
         0x10000000...0x10000007 => .{ 0x10000000, uart.uart.passiv_regs[0..], kind.UART },
         0x80000000...0x800fffff => .{ 0x80000000, perif.ram[0..], kind.RAM },
         else => return Err.BadAdress,
@@ -86,6 +95,12 @@ pub fn get_addr(addr: u32, byte_nb: u32) !struct { u32, []u8, kind } {
     if (t == kind.UART) {
         if (byte_nb != 1) {
             return Err.UartBadByteSize;
+        }
+    }
+    if (t == kind.FINISHER) {
+        // on n'accepte qu'un mot de 32 bits à l'offset 0
+        if (byte_nb != 4 or offset != 0) {
+            return Err.FinisherBadAccess;
         }
     }
     return .{ offset, mem, t };
@@ -99,6 +114,10 @@ pub fn fetch_mem(addr: u32, byte_size: u32) !u32 {
     }
     const offset: u32, const mem: []u8, const t: kind = try get_addr(addr, byte_size);
     var data: u32 = 0;
+    if (t == kind.FINISHER) {
+        // le finisher se relit à 0
+        return 0;
+    }
     if (t != kind.UART) {
         for (0..byte_size) |i| {
             const shift: u5 = @truncate(i * 8);
@@ -117,7 +136,9 @@ pub fn store_mem(addr: u32, byte_size: u32, value: u32) !void {
         return Err.Byte_Size_Err;
     }
     const offset: u32, const mem: []u8, const t: kind = try get_addr(addr, byte_size);
-    if (t == kind.UART) {
+    if (t == kind.FINISHER) {
+        finisher.write(value);
+    } else if (t == kind.UART) {
         const offsetu3: u3 = @truncate(offset);
         uart.uart.setter(offsetu3, @truncate(value));
     } else {

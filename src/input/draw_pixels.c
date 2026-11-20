@@ -1,5 +1,5 @@
 int main(void){
-    volatile int *screen = (volatile int *)0x1000;
+    volatile int *screen = (volatile int *)0x40000000; // framebuffer (voir bus.zig)
     volatile char   *uart = (volatile char *)0x10000000;
     char buf;
 

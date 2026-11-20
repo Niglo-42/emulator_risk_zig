@@ -76,7 +76,7 @@ pub fn _S(instr: S) !void {
         0 => 1, // SB
         1 => 2, // SH
         2 => 4, // SW
-        else => return,
+        else => return Err.BadByteNb, // avant : ignoré en silence
     };
 
     const addr = bus.regs[instr.rs1] +% instr.get_imm();
@@ -313,7 +313,7 @@ const B = packed struct(u32) {
     }
 };
 
-const I = packed struct(u32) {
+pub const I = packed struct(u32) {
     opcode: u7,
     rd: u5,
     func3: u3,
