@@ -95,7 +95,7 @@ pub fn parse_elf(buffer: []u8) ![]struct { u32, u32 } {
         );
     }
 
-    if (e_flags != 0) {
+    if (e_flags & ~@as(u32, 1) != 0) {
         try print_err.error_handeling(
             e_flags,
             0,

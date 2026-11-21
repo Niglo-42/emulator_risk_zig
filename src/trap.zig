@@ -42,9 +42,6 @@ pub const Fault = error{
 
 pub var pending_tval: u32 = 0;
 
-// ===========================================================================
-// À ÉCRIRE PAR THOMAS (voir le pseudo-code dans la conversation)
-// ===========================================================================
 
 /// Entrée en trap. Appelée par la boucle fetch quand une instruction a
 /// provoqué une exception (plus tard : quand une interruption est prise).
@@ -54,21 +51,46 @@ pub var pending_tval: u32 = 0;
 /// Au moment de l'appel, fetch.pc vaut encore l'adresse de l'instruction
 /// fautive : elle n'a eu aucun effet.
 ///
-/// Outils disponibles :
-///   csr.read(.mstatus), csr.set_raw(.mepc, valeur), ...
-///   csr.privilege (var u2), csr.MACHINE, csr.USER
-///   csr.MSTATUS_MIE, csr.MSTATUS_MPIE, csr.MSTATUS_MPP (masques de bits)
-///   fetch.pc (var u32)
+/// 
+ 
 pub fn take_trap(cause: u32, tval: u32) void {
-    _ = cause;
-    _ = tval;
-    @panic("trap.take_trap n'est pas encore écrit");
+    csr.set_raw(csr.Config.mepc, fetch.pc);
+    csr.set_raw(csr.Config.mcause, cause);
+    csr.set_raw(csr.Config.mtval, tval);
+    var s = csr.read(csr.Config.mstatus);
+    if (s & csr.MSTATUS_MIE != 0) {
+        s |= csr.MSTATUS_MPIE;
+    } else {
+        s = s & ~csr.MSTATUS_MPIE;
+    }
+    s = s & ~csr.MSTATUS_MIE;
+    s = s & ~csr.MSTATUS_MPP;
+    s = s | @as(u32, csr.privilege) << 11;
+    csr.set_raw(csr.Config.mstatus, s);
+    csr.privilege = csr.MACHINE;
+    fetch.pc = csr.read(csr.Config.mtvec) & 0xfffffffc;
 }
 
 /// Instruction mret (0x30200073) : retour du handler.
 /// Doit renvoyer Fault.IllegalInstruction si on n'est pas en mode M.
 /// Attention : après mret, la boucle ne doit PAS ajouter 4 au pc
 /// (c'est géré dans decode : mret compte comme un saut).
+/// 
+
 pub fn mret() Fault!void {
-    @panic("trap.mret n'est pas encore écrit");
+    if (csr.privilege != csr.MACHINE) {
+        return Fault.IllegalInstruction;
+    }
+    var s = csr.read(csr.Config.mstatus);
+    const mpie = (s & csr.MSTATUS_MPIE) >> 4;
+    const mpp = (s & csr.MSTATUS_MPP);
+    //   ancien ← le champ MPP de s
+    s = s & ~csr.MSTATUS_MIE;
+    s = s | mpie;
+    s = s & ~csr.MSTATUS_MPIE;
+    s = s | 1 << 7;
+    s = s & ~csr.MSTATUS_MPP;
+    csr.set_raw(csr.Config.mstatus, s);
+    csr.privilege = @truncate(mpp >> 11);
+    fetch.pc = csr.read(csr.Config.mepc);
 }
