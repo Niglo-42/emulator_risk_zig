@@ -272,10 +272,6 @@ pub fn execute(instr: op.I, kind: CsrOp) Err!void {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests unitaires : `zig test src/csr.zig` ne marche pas seul (imports),
-// lance plutôt `zig build test`.
-// ---------------------------------------------------------------------------
 fn make_instr(csr_number: u12, rs1: u5, rd: u5, funct3: u3) op.I {
     return op.I{ .opcode = 0x73, .rd = rd, .func3 = funct3, .rs1 = rs1, .imm = csr_number };
 }

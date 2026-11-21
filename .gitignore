@@ -5,3 +5,5 @@ zig-pkg
 # riscv-tests (cloné par tests/run_isa_tests.sh) et binaires de test
 tests/riscv-tests
 tests/build/
+0001-Zicsr-corrig-infrastructure-de-tests-riscv-tests-bug.patch
+0002-Pr-paration-des-traps-fautes-du-guest-ecall-ebreak-m.patch
