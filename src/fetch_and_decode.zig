@@ -260,17 +260,7 @@ fn decode(instr: u32, debug: bool) !void {
 
 // Instruction
 
-// Opération
-// MUL
-// Multiplication, partie basse
-// MULH
-// Multiplication signed × signed, partie haute
-// MULHU
-// Multiplication unsigned × unsigned, partie haute
-// MULHSU
-// Multiplication signed × unsigned, partie haute
-// MULW
-// Multiplication sur 32 bits (RV64 uniquement)
+
 
 // Transforme une erreur remontée par decode en trap pour le guest.
 // Toute erreur qui n'est PAS une faute du guest est un bug de l'émulateur :
