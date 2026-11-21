@@ -235,6 +235,10 @@ fn decode(instr: u32, debug: bool) !void {
                 },
             }
         },
+        0x2f => {
+            // extension A : lr.w, sc.w et les 9 AMO
+            try op._amo(instruction.R);
+        },
         0xf => {
             // fence (funct3 0) et fence.i (funct3 1) : rien à faire chez
             // nous (un seul cœur, pas de cache). Le reste est illégal.
@@ -273,6 +277,12 @@ fn handle_fault(err: anyerror, instr: u32, debug: bool) !void {
         },
         error.InstructionMisaligned => {
             try raise(trap.CAUSE_INSTRUCTION_MISALIGNED, trap.pending_tval, debug);
+        },
+        error.LoadMisaligned => {
+            try raise(trap.CAUSE_LOAD_MISALIGNED, trap.pending_tval, debug);
+        },
+        error.StoreMisaligned => {
+            try raise(trap.CAUSE_STORE_MISALIGNED, trap.pending_tval, debug);
         },
         error.LoadAccessFault => {
             try raise(trap.CAUSE_LOAD_ACCESS_FAULT, trap.pending_tval, debug);

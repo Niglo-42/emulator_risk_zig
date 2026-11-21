@@ -3,6 +3,7 @@ const bus = @import("bus.zig");
 const fetch = @import("fetch_and_decode.zig");
 const csr_ = @import("csr.zig");
 const trap = @import("trap.zig");
+const reservation = @import("reservation.zig");
 const Err = error{
     BadByteNb,
     ReadConst,
@@ -151,6 +152,113 @@ pub fn _B(instr: B) trap.Fault!bool {
         fetch.pc = target;
     }
     return taken;
+}
+
+// ---------------------------------------------------------------------------
+// Extension A (opcode 0x2F, funct3 = 010 pour .w)
+// funct5 = bits 31:27 (les 5 bits hauts de func7) choisit l'opération.
+// Les bits 26 (aq) et 25 (rl) règlent l'ordre mémoire entre plusieurs
+// cœurs : avec un seul cœur, on les ignore.
+//
+// Pourquoi c'est atomique sans verrou : une instruction s'exécute en
+// entier dans un seul appel à decode, et les interruptions ne seront
+// prises qu'ENTRE deux instructions (dans la boucle fetch). Rien ne peut
+// donc s'intercaler entre la lecture et l'écriture d'un AMO.
+// ---------------------------------------------------------------------------
+const AMO_LR: u5 = 0b00010;
+const AMO_SC: u5 = 0b00011;
+const AMO_SWAP: u5 = 0b00001;
+const AMO_ADD: u5 = 0b00000;
+const AMO_XOR: u5 = 0b00100;
+const AMO_AND: u5 = 0b01100;
+const AMO_OR: u5 = 0b01000;
+const AMO_MIN: u5 = 0b10000;
+const AMO_MAX: u5 = 0b10100;
+const AMO_MINU: u5 = 0b11000;
+const AMO_MAXU: u5 = 0b11100;
+
+pub fn _amo(instr: R) trap.Fault!void {
+    if (instr.func3 != 2) {
+        return trap.Fault.IllegalInstruction; // seulement .w en RV32
+    }
+    const funct5: u5 = @truncate(instr.func7 >> 2);
+    // on lit les sources AVANT toute écriture (rd peut être == rs1 ou rs2)
+    const addr = bus.regs[instr.rs1];
+    const src = bus.regs[instr.rs2];
+
+    // contrairement aux load/store normaux, l'alignement est obligatoire
+    if (addr & 3 != 0) {
+        trap.pending_tval = addr;
+        if (funct5 == AMO_LR) {
+            return trap.Fault.LoadMisaligned;
+        }
+        return trap.Fault.StoreMisaligned;
+    }
+
+    if (funct5 == AMO_LR) {
+        if (instr.rs2 != 0) {
+            return trap.Fault.IllegalInstruction;
+        }
+        const value = bus.fetch_mem(addr, 4) catch {
+            trap.pending_tval = addr;
+            return trap.Fault.LoadAccessFault;
+        };
+        reservation.reserve(addr);
+        if (instr.rd != 0) {
+            bus.regs[instr.rd] = value;
+        }
+        return;
+    }
+
+    if (funct5 == AMO_SC) {
+        var result: u32 = 1; // non nul = échec
+        if (reservation.check_and_consume(addr)) {
+            bus.store_mem(addr, 4, src) catch {
+                trap.pending_tval = addr;
+                return trap.Fault.StoreAccessFault;
+            };
+            result = 0; // succès
+        }
+        if (instr.rd != 0) {
+            bus.regs[instr.rd] = result;
+        }
+        return;
+    }
+
+    // Les 9 AMO. Une faute, même pendant la LECTURE, est signalée comme
+    // une faute de store (mcause 7).
+    const old = bus.fetch_mem(addr, 4) catch {
+        trap.pending_tval = addr;
+        return trap.Fault.StoreAccessFault;
+    };
+    var new: u32 = 0;
+    switch (funct5) {
+        AMO_SWAP => new = src,
+        AMO_ADD => new = old +% src,
+        AMO_XOR => new = old ^ src,
+        AMO_AND => new = old & src,
+        AMO_OR => new = old | src,
+        AMO_MIN => {
+            if (@as(i32, @bitCast(old)) < @as(i32, @bitCast(src))) new = old else new = src;
+        },
+        AMO_MAX => {
+            if (@as(i32, @bitCast(old)) > @as(i32, @bitCast(src))) new = old else new = src;
+        },
+        AMO_MINU => {
+            if (old < src) new = old else new = src;
+        },
+        AMO_MAXU => {
+            if (old > src) new = old else new = src;
+        },
+        else => return trap.Fault.IllegalInstruction,
+    }
+    bus.store_mem(addr, 4, new) catch {
+        trap.pending_tval = addr;
+        return trap.Fault.StoreAccessFault;
+    };
+    if (instr.rd != 0) {
+        bus.regs[instr.rd] = old;
+    }
 }
 
 pub fn mul(a: u32, b: u32) u32 {
@@ -302,7 +410,7 @@ const J_imm = packed struct(u32) {
     imm20_31: u12,
 };
 
-const R = packed struct(u32) {
+pub const R = packed struct(u32) {
     opcode: u7,
     rd: u5,
     func3: u3,

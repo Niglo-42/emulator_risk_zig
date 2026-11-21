@@ -39,9 +39,9 @@ pub var instret_written = false;
 // Indexé par le numéro du CSR.
 var storage: [0x1000]u32 = @splat(0);
 
-// RV32 (bits 31:30 = 01) + I (bit 8) + M (bit 12) + U (bit 20).
-// Quand l'extension A sera implémentée, ajoute le bit 0 -> 0x40101101.
-pub const MISA_VALUE: u32 = (1 << 30) | (1 << 8) | (1 << 12) | (1 << 20);
+// RV32 (bits 31:30 = 01) + A (bit 0) + I (bit 8) + M (bit 12) + U (bit 20)
+// = 0x40101101
+pub const MISA_VALUE: u32 = (1 << 30) | (1 << 0) | (1 << 8) | (1 << 12) | (1 << 20);
 
 // Bits de mstatus (utilisés par les traps à l'étape suivante)
 pub const MSTATUS_MIE: u32 = 1 << 3;

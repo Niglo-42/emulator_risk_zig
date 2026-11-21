@@ -71,7 +71,8 @@ pub fn disassembly(command: INSTRUCTION) void {
         0x6f => "jal",
         0x37 => "lui",
         0x17 => "auipc",
-        0x73 => "ecall",
+        0x73 => "system (ecall/csr/mret...)",
+        0x2f => "atomique (lr/sc/amo)",
         else => "invalid type",
     };
 

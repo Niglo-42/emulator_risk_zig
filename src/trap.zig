@@ -17,7 +17,9 @@ pub const CAUSE_INSTRUCTION_MISALIGNED: u32 = 0; // saut vers une adresse non mu
 pub const CAUSE_INSTRUCTION_ACCESS_FAULT: u32 = 1; // fetch à une adresse hors du bus
 pub const CAUSE_ILLEGAL_INSTRUCTION: u32 = 2;
 pub const CAUSE_BREAKPOINT: u32 = 3; // ebreak
+pub const CAUSE_LOAD_MISALIGNED: u32 = 4; // lr.w à une adresse non alignée
 pub const CAUSE_LOAD_ACCESS_FAULT: u32 = 5;
+pub const CAUSE_STORE_MISALIGNED: u32 = 6; // sc.w / AMO à une adresse non alignée
 pub const CAUSE_STORE_ACCESS_FAULT: u32 = 7;
 pub const CAUSE_ECALL_FROM_U: u32 = 8;
 pub const CAUSE_ECALL_FROM_M: u32 = 11;
@@ -34,7 +36,9 @@ pub const Fault = error{
     IllegalInstruction,
     InstructionMisaligned,
     InstructionAccessFault,
+    LoadMisaligned,
     LoadAccessFault,
+    StoreMisaligned,
     StoreAccessFault,
     Ecall,
     Breakpoint,

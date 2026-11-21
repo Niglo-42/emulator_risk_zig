@@ -2,7 +2,7 @@
 # Compile et lance les riscv-tests dans l'émulateur.
 #
 # usage :
-#   tests/run_isa_tests.sh                 # rv32ui + rv32um
+#   tests/run_isa_tests.sh                 # rv32ui + rv32um + rv32ua
 #   tests/run_isa_tests.sh rv32ui          # une seule suite
 #   tests/run_isa_tests.sh rv32ui/add      # un seul test
 #   tests/run_isa_tests.sh local           # nos tests maison (tests/isa/*.S)
@@ -40,7 +40,7 @@ if [ ! -x "$EMU" ]; then
 fi
 
 # zicsr et zifencei : les GCC récents ne les incluent plus dans rv32i
-MARCH=rv32im_zicsr_zifencei
+MARCH=rv32ima_zicsr_zifencei
 if [ -z "${CC:-}" ]; then
     if command -v riscv64-unknown-elf-gcc >/dev/null; then
         CC=riscv64-unknown-elf-gcc
@@ -59,7 +59,7 @@ CFLAGS="$CFLAGS -static -mcmodel=medany -nostdlib -nostartfiles \
 
 # quels tests ?
 if [ $# -eq 0 ]; then
-    set -- rv32ui rv32um local
+    set -- rv32ui rv32um rv32ua local
 fi
 TESTS=()
 for arg in "$@"; do

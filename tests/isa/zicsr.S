@@ -20,8 +20,8 @@ RVTEST_CODE_BEGIN
   TEST_CASE( 6, a0, 0x80, li t0, 0x8; csrc mie, t0; csrr a0, mie );
   # masque de mie : seuls les bits 3, 7 et 11 existent
   TEST_CASE( 7, a0, 0x888, li t0, -1; csrw mie, t0; csrr a0, mie );
-  # misa : écriture ignorée (RV32 + I + M + U)
-  TEST_CASE( 8, a0, 0x40101100, csrw misa, zero; csrr a0, misa );
+  # misa : écriture ignorée (RV32 + A + I + M + U)
+  TEST_CASE( 8, a0, 0x40101101, csrw misa, zero; csrr a0, misa );
   # masque de mstatus : MIE, MPIE, MPP
   TEST_CASE( 9, a0, 0x1888, li t0, -1; csrw mstatus, t0; csrr a0, mstatus );
   # variantes immédiates
