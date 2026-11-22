@@ -12,24 +12,25 @@
 // aurait dû échouer casse l'atomicité. Dans le doute : échec.
 
 // ===========================================================================
-// À ÉCRIRE PAR THOMAS : l'état (variables globales) et les 3 fonctions.
-// Pense aussi à QUI doit appeler clear() en dehors de sc (indice : trap.zig).
+// QUI doit appeler clear() en dehors de sc (rep dans : trap.zig).
 // ===========================================================================
+
+pub var addr_reserved: u32 = 0;
 
 /// Appelée par lr.w, avec l'adresse lue (déjà vérifiée alignée et valide).
 pub fn reserve(addr: u32) void {
-    _ = addr;
-    @panic("reservation.reserve n'est pas encore écrit");
+    addr_reserved = addr;
 }
 
 /// Appelée par sc.w AVANT d'écrire. Renvoie true si sc a le droit d'écrire
 /// à `addr`. Dans tous les cas, la réservation est consommée.
 pub fn check_and_consume(addr: u32) bool {
-    _ = addr;
-    @panic("reservation.check_and_consume n'est pas encore écrit");
+    const res =  addr == addr_reserved;
+    clear();
+    return res;
 }
 
 /// Détruit la réservation, s'il y en a une.
 pub fn clear() void {
-    @panic("reservation.clear n'est pas encore écrit");
+    addr_reserved = 0;
 }

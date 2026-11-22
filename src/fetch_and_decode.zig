@@ -22,7 +22,7 @@ fn decode(instr: u32, debug: bool) !void {
         dbg.disassembly(instruction);
     }
 
-    var flag = false;
+    var inc = true;
     switch (instruction.R.opcode) {
         0x33 => {
             switch (instruction.R.func7) {
@@ -150,7 +150,7 @@ fn decode(instr: u32, debug: bool) !void {
         },
         0x63 => {
             //B : funct3 2 et 3 n'existent pas (op._B renvoie une faute)
-            flag = try op._B(instruction.B);
+            inc = try op._B(instruction.B);
         },
         0x23 => {
             try op._S(instruction.S);
@@ -163,14 +163,14 @@ fn decode(instr: u32, debug: bool) !void {
         },
         0x6f => {
             try op.jal(instruction.J);
-            flag = true;
+            inc = false;
         },
         0x67 => {
             if (instruction.I.func3 != 0) {
                 return trap.Fault.IllegalInstruction;
             }
             try op.jalr(instruction.I);
-            flag = true;
+            inc = false;
         },
         0x73 => {
             // system
@@ -192,7 +192,7 @@ fn decode(instr: u32, debug: bool) !void {
                         0x302 => {
                             // mret écrit lui-même le pc : comme un saut
                             try trap.mret();
-                            flag = true;
+                            inc = false;
                         },
                         0x105 => {
                             // wfi : "attends une interruption". Pour l'instant
@@ -256,7 +256,7 @@ fn decode(instr: u32, debug: bool) !void {
             return trap.Fault.IllegalInstruction;
         },
     }
-    if (flag == false) {
+    if (inc == true) {
         pc += 4;
     }
     bus.regs[0] = 0; // force x0 à 0

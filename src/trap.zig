@@ -9,6 +9,7 @@
 const std = @import("std");
 const csr = @import("csr.zig");
 const fetch = @import("fetch_and_decode.zig");
+const reserv = @import("reservation.zig");
 
 // ---------------------------------------------------------------------------
 // Les causes (valeur de mcause). Bit 31 à 0 = exception.
@@ -72,6 +73,7 @@ pub fn take_trap(cause: u32, tval: u32) void {
     s = s | @as(u32, csr.privilege) << 11;
     csr.set_raw(csr.Config.mstatus, s);
     csr.privilege = csr.MACHINE;
+    reserv.clear();
     fetch.pc = csr.read(csr.Config.mtvec) & 0xfffffffc;
 }
 
@@ -93,7 +95,7 @@ pub fn mret() Fault!void {
     s = s | mpie;
     s = s & ~csr.MSTATUS_MPIE;
     s = s | 1 << 7;
-    s = s & ~csr.MSTATUS_MPP;
+    s = s & ~csr.MSTATUS_MPP; // met en mode user
     csr.set_raw(csr.Config.mstatus, s);
     csr.privilege = @truncate(mpp >> 11);
     fetch.pc = csr.read(csr.Config.mepc);

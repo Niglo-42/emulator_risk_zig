@@ -110,48 +110,23 @@ pub fn _S(instr: S) !void {
 
 // Renvoie true si le branchement est pris (le pc a déjà été mis à jour).
 pub fn _B(instr: B) trap.Fault!bool {
-    var taken = false;
-    switch (instr.func3) {
-        0 => { // beq
-            if (@as(i32, @bitCast(bus.regs[instr.rs1])) == @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                taken = true;
-            }
-        },
-        1 => { // bne
-            if (@as(i32, @bitCast(bus.regs[instr.rs1])) != @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                taken = true;
-            }
-        },
-        4 => { //blt
-            if (@as(i32, @bitCast(bus.regs[instr.rs1])) < @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                taken = true;
-            }
-        },
-        5 => { //bge
-            if (@as(i32, @bitCast(bus.regs[instr.rs1])) >= @as(i32, @bitCast(bus.regs[instr.rs2]))) {
-                taken = true;
-            }
-        },
-        6 => { //bltu
-            if (bus.regs[instr.rs1] < bus.regs[instr.rs2]) {
-                taken = true;
-            }
-        },
-        7 => { //bgeu
-            if (bus.regs[instr.rs1] >= bus.regs[instr.rs2]) {
-                taken = true;
-            }
-        },
+    const taken = switch (instr.func3) {
+        0 => if (@as(i32, @bitCast(bus.regs[instr.rs1])) == @as(i32, @bitCast(bus.regs[instr.rs2]))) true else false,
+        1 => if (@as(i32, @bitCast(bus.regs[instr.rs1])) != @as(i32, @bitCast(bus.regs[instr.rs2]))) true else false,
+        4 => if (@as(i32, @bitCast(bus.regs[instr.rs1])) < @as(i32, @bitCast(bus.regs[instr.rs2]))) true else false,
+        5 => if (@as(i32, @bitCast(bus.regs[instr.rs1])) >= @as(i32, @bitCast(bus.regs[instr.rs2]))) true else false,
+        6 => if (bus.regs[instr.rs1] < bus.regs[instr.rs2]) true else false,
+        7 => if (bus.regs[instr.rs1] >= bus.regs[instr.rs2]) true else false,
         else => {
             return trap.Fault.IllegalInstruction;
         },
-    }
+    };
     if (taken) {
         const target = fetch.pc +% instr.get_imm();
         try check_jump_target(target);
         fetch.pc = target;
     }
-    return taken;
+    return if (taken) false else true;
 }
 
 // ---------------------------------------------------------------------------
